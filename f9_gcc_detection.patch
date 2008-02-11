@@ -1,0 +1,17 @@
+diff --git a/src/configure.ac b/src/configure.ac
+index af0150f..5cacc49 100644
+--- a/src/configure.ac
++++ b/src/configure.ac
+@@ -840,6 +840,12 @@ case "$gcc_vers" in
+     CompilerMinor="1"
+     CompilerPatch="2"
+     ;;
++ "4.3.0" )
++    CompilerKind="GCC"
++    CompilerMajor="4"
++    CompilerMinor="3"
++    CompilerPatch="0"
++    ;;
+  * )
+    AC_MSG_RESULT([ERROR])
+    AC_MSG_ERROR([Condor will not compile with gcc version $gcc_vers])
