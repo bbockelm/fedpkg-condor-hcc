@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.0.0
-Release: 6%{?dist}
+Release: 7%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -20,7 +20,8 @@ Source1: generate-tarball.sh
 Patch0: lsb_init.patch
 Patch1: f9_gcc_detection.patch
 Patch2: f9_glibc_detection.patch
-Patch3: gsoap_nonamespaces.patch
+Patch3: isolate-gsoap-linking.patch
+
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires: imake
@@ -31,7 +32,7 @@ BuildRequires: pcre-devel
 BuildRequires: postgresql-devel
 BuildRequires: openssl-devel
 BuildRequires: krb5-devel
-BuildRequires: gsoap-devel
+BuildRequires: gsoap-devel >= 2.7.10-2
 BuildRequires: bind-utils
 BuildRequires: m4
 BuildRequires: autoconf
@@ -40,7 +41,7 @@ Requires: pcre
 Requires: postgresql-libs
 Requires: openssl
 Requires: krb5-libs
-Requires: gsoap
+Requires: gsoap >= 2.7.10-2
 Requires: mailx
 
 Requires(pre): shadow-utils
@@ -442,6 +443,9 @@ fi
 
 
 %changelog
+* Fri Apr  4 2008  <mfarrellee@redhat> - 7.0.0-7
+- Updated to handle changes in gsoap dependency
+
 * Mon Feb 11 2008  <mfarrellee@redhat> - 7.0.0-6
 - Added note about how to download the source
 - Added generate-tarball.sh script
