@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.0.0
-Release: 7%{?dist}
+Release: 8%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -443,6 +443,9 @@ fi
 
 
 %changelog
+* Mon Apr  7 2008  <mfarrellee@redhat> - 7.0.0-8
+- Modified init script to be off by default, resolves bz441279
+
 * Fri Apr  4 2008  <mfarrellee@redhat> - 7.0.0-7
 - Updated to handle changes in gsoap dependency
 
