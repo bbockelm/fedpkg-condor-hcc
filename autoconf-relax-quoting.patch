@@ -1,0 +1,27 @@
+commit c1a10db8a078c72752c8aeeb6b2afcabcf1d5e06
+Author: Matthew Farrellee <mfarrellee@redhat.com>
+Date:   Wed Aug 6 10:40:30 2008 -0500
+
+    Relax the overquoting in CONDOR_SET_ANALYZE, F10's autoconf complains
+
+diff --git a/src/aclocal.m4 b/src/aclocal.m4
+index 3fb2c83..e31f0d5 100644
+--- a/src/aclocal.m4
++++ b/src/aclocal.m4
+@@ -477,7 +477,7 @@ AC_DEFUN([CONDOR_SET_ANALYZE],
+  if test "x$[ac_condor_analyze_[$1]]" = "x"; then
+    if test ! "x$ac_condor_analyze" = "x" ; then
+      AC_MSG_WARN([no condor_analyze.$1 found, using $ac_condor_analyze])
+-     AC_SUBST([condor_analyze_[$1]],$ac_condor_analyze)
++     AC_SUBST([condor_analyze_$1],$ac_condor_analyze)
+    else
+      if test "$2" = "fatal" ; then 
+        AC_MSG_ERROR([neither condor_analyze.$1 nor condor_analyze found])
+@@ -486,7 +486,7 @@ AC_DEFUN([CONDOR_SET_ANALYZE],
+      fi
+    fi
+  else 
+-   AC_SUBST([condor_analyze_[$1]],$[ac_condor_analyze_[$1]])
++   AC_SUBST([condor_analyze_$1],$[ac_condor_analyze_$1])
+  fi
+ ])

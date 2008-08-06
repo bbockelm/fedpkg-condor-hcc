@@ -22,6 +22,7 @@ Source1: generate-tarball.sh
 Patch0: condor_config.generic.patch
 Patch2: GLibCFlag28.patch
 Patch3: DetectGCC430.patch
+Patch4: autoconf-relax-quoting.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -93,6 +94,7 @@ exit 0
 %patch0 -p1
 %patch2 -p1
 %patch3 -p1
+%patch4 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -454,6 +456,7 @@ fi
 * Wed Aug  6 2008  <mfarrellee@redhat> - 7.0.4-1
 - Updated to 7.0.4 source
 - Stopped using condor_configure in install step
+- Patched aclocal.m4 to handle autoconf 2.62
 
 * Tue Jun 10 2008  <mfarrellee@redhat> - 7.0.2-1
 - Updated to 7.0.2 source
