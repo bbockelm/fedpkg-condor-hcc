@@ -12,7 +12,7 @@ echo "Processing $input"
 echo "...extracting $input"
 tar xzf $input
 
-cd condor_src-$1
+cd condor-$1
 
 if [ ! -f BUILD-ID ] ; then
    build="UNKNOWN"
@@ -32,7 +32,6 @@ mv externals/man externals/bundles/
 
 echo "...creating condor-$1-$build-RH.tar.gz"
 cd ..
-mv condor_src-$1 condor-$1
 tar czfsp condor-$1-$build-RH.tar.gz condor-$1
 
 echo "...cleaning up"

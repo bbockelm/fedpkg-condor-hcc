@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.0.0
-Release: 8%{?dist}
+Version: 7.0.4
+Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -11,16 +11,17 @@ URL: http://www.cs.wisc.edu/condor/
 # click-through license. Once you have downloaded the source from:
 #   http://parrot.cs.wisc.edu/v7.0.license.html
 # you should process it with generate-tarball.sh:
-#   ./generate-tarball.sh 7.0.0
+#   ./generate-tarball.sh 7.0.4
 # MD5Sum of upstream source:
 #   06eec3ae274b66d233ad050a047f3c91  condor_src-7.0.0-all-all.tar.gz
+#   b08743cfa2e87adbcda042896e8ef537  condor_src-7.0.2-all-all.tar.gz
+#   5f326ad522b63eacf34c6c563cf46910  condor_src-7.0.4-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.0.0-72173-1-RH.tar.gz
+Source0: condor-7.0.4-95033-RH.tar.gz
 Source1: generate-tarball.sh
-Patch0: lsb_init.patch
-Patch1: f9_gcc_detection.patch
-Patch2: f9_glibc_detection.patch
-Patch3: isolate-gsoap-linking.patch
+Patch0: condor_config.generic.patch
+Patch2: GLibCFlag28.patch
+Patch3: DetectGCC430.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -36,6 +37,7 @@ BuildRequires: gsoap-devel >= 2.7.10-2
 BuildRequires: bind-utils
 BuildRequires: m4
 BuildRequires: autoconf
+BuildRequires: classads-devel
 
 Requires: pcre
 Requires: postgresql-libs
@@ -43,6 +45,7 @@ Requires: openssl
 Requires: krb5-libs
 Requires: gsoap >= 2.7.10-2
 Requires: mailx
+Requires: classads
 
 Requires(pre): shadow-utils
 
@@ -86,8 +89,8 @@ exit 0
 
 %prep
 %setup -q -n %{name}-%{version}
+
 %patch0 -p1
-%patch1 -p1
 %patch2 -p1
 %patch3 -p1
 
@@ -96,12 +99,6 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 
 
 %build
-# site.def still lives, unfortunately, so we need to update it properly
-sed -e "s:^#define Top .*:#define Top $PWD/..:" \
-  $PWD/config/site.def \
-  > $PWD/config/site.def-
-mv $PWD/config/site.def- $PWD/config/site.def
-
 # set USE_OLD_IMAKE to anything so condor_imake will use the system
 # installed imake instead of building its own
 USE_OLD_IMAKE=YES
@@ -113,11 +110,11 @@ export USE_OLD_IMAKE
 %define optflags %(rpm --eval '%%optflags' | sed 's|-O2||g')
 
 cd src
-# Must regenerate configure script from configure.ac because of F9 GCC
-# Detection and F9 GLIBC Detection patches
-autoheader && autoconf
-%configure --with-proper \
-   --without-full-port \
+./build_init
+%configure --enable-proper \
+   --disable-full-port \
+   --disable-gcc-version-check \
+   --disable-glibc-version-check \
    --disable-static \
    --disable-rpm \
    --without-zlib \
@@ -125,6 +122,7 @@ autoheader && autoconf
    --with-krb5 \
    --with-postgresql \
    --with-gsoap \
+   --without-classads \
    --with-man=$PWD/../externals/bundles/man/current
 
 # SMP_NUM_JOBS must be set properly to pass -j to make
@@ -148,42 +146,31 @@ rm -rf %{buildroot}
 
 # make public creates release tarballs which we will install
 cd public/v7.0
-gzip -cd condor-7.0.0-*-dynamic-unstripped.tar.gz | tar x
-cd condor-7.0.0
+gzip -cd condor-%{version}-*-dynamic-unstripped.tar.gz | tar x
+cd condor-%{version}
+
 PREFIX=%{buildroot}/install
-mkdir -p $PREFIX
-./condor_configure --install \
-   --maybe-daemon-owner \
-   --install-dir=$PREFIX \
-   --local-dir=$PREFIX/local_dir
 
-# condor_configure does not write a perfect config file, and it throws
-# in some absolute paths, so we need to fix it up a bit
-sed -e "s:^RELEASE_DIR.*=.*:RELEASE_DIR = /usr:" \
-    -e "s:^LOCAL_CONFIG_FILE.*=.*:LOCAL_CONFIG_FILE = /var/lib/condor/condor_config.local:" \
-    -e "s:^LOCAL_DIR.*=.*:LOCAL_DIR = /var/lib/condor:" \
-    -e "s:^LIB\W.*=.*:LIB = \$(RELEASE_DIR)/share/condor:" \
-    -e "s:^INCLUDE.*=.*:INCLUDE = \$(RELEASE_DIR)/include/condor:" \
-    -e "s:^LIBEXEC.*=.*:LIBEXEC = \$(RELEASE_DIR)/libexec/condor:" \
-    -e "s:^PERIODIC_EXPR_INTERVAL.*=.*:PERIODIC_EXPR_INTERVAL = 15:" \
-    -e "s:^UID_DOMAIN.*=.*:UID_DOMAIN = \$(FULL_HOSTNAME):" \
-    -e "s:^FILESYSTEM_DOMAIN.*=.*:FILESYSTEM_DOMAIN = \$(FULL_HOSTNAME):" \
-  $PREFIX/etc/condor_config \
-  > $PREFIX/etc/condor_config-
-mv $PREFIX/etc/condor_config- $PREFIX/etc/condor_config
+populate install *
 
-# condor_configure also writes an imperfect local config file
-sed -e "s:^CONDOR_HOST.*=.*:CONDOR_HOST = \$(FULL_HOSTNAME):" \
-    -e "s:^RELEASE_DIR.*=.*:#RELEASE_DIR =:" \
-    -e "s:^LOCAL_DIR.*=.*:LOCAL_DIR = /var/lib/condor:" \
-    -e "s:^CONDOR_ADMIN.*=.*:CONDOR_ADMIN = condor@localhost:" \
-    -e "s:^COLLECTOR_NAME.*=.*:COLLECTOR_NAME = Personal Condor:" \
-    -e "s:^CONDOR_IDS.*=.*:#CONDOR_IDS = NO_DEFAULT:" \
-  $PREFIX/local_dir/condor_config.local \
-  > $PREFIX/local_dir/condor_config.local-
-mv $PREFIX/local_dir/condor_config.local- $PREFIX/local_dir/condor_config.local
-# shorten the negotiation cycle so jobs start faster
-echo "NEGOTIATOR_INTERVAL = 20" >> $PREFIX/local_dir/condor_config.local
+cp $PREFIX/etc/examples/condor_config.generic $PREFIX/etc/condor_config
+
+mkdir $PREFIX/local_dir
+mkdir -m1777 $PREFIX/local_dir/execute
+mkdir -m0755 $PREFIX/local_dir/log
+mkdir -m0755 $PREFIX/local_dir/spool
+
+cat >> $PREFIX/local_dir/condor_config.local << EOF
+CONDOR_HOST = \$(FULL_HOSTNAME)
+COLLECTOR_NAME = Personal Condor
+START = TRUE
+SUSPEND = FALSE
+PREEMPT = FALSE
+KILL = FALSE
+DAEMON_LIST = COLLECTOR, MASTER, NEGOTIATOR, SCHEDD, STARTD
+NEGOTIATOR_INTERVAL = 20
+EOF
+
 # this gets around a bug whose fix is not yet merged
 echo "TRUST_UID_DOMAIN = TRUE" >> $PREFIX/local_dir/condor_config.local
 
@@ -223,7 +210,7 @@ populate %_libexecdir/condor $PREFIX/libexec/*
 populate %_var/lib/condor $PREFIX/local_dir/*
 
 # install the lsb init script
-install -Dp -m0755 ../../../condor.init %buildroot/%_initrddir/condor
+install -Dp -m0755 $PREFIX/etc/examples/condor.init %buildroot/%_initrddir/condor
 
 # we must place the config examples in builddir so %doc can find them
 mv $PREFIX/etc/examples %_builddir/%name-%version
@@ -264,6 +251,7 @@ rm -rf %{buildroot}
 %_datadir/condor/webservice/condorDbmsd.wsdl
 %_datadir/condor/webservice/condorDcskel.wsdl
 %_datadir/condor/webservice/condorEventd.wsdl
+%_datadir/condor/webservice/condorGridmanager.wsdl
 %_datadir/condor/webservice/condorHad.wsdl
 %_datadir/condor/webservice/condorMaster.wsdl
 %_datadir/condor/webservice/condorNegotiator.wsdl
@@ -277,15 +265,27 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_chirp
 %_libexecdir/condor/condor_ssh
 %_libexecdir/condor/sshd.sh
+%_libexecdir/condor/condor_ckpt_probe
+%_libexecdir/condor/gridftp_wrapper.sh
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_checkpoint.1.gz
+%_mandir/man1/condor_check_userlogs.1.gz
+%_mandir/man1/condor_chirp.1.gz
+%_mandir/man1/condor_cod.1.gz
+%_mandir/man1/condor_cold_start.1.gz
+%_mandir/man1/condor_cold_stop.1.gz
 %_mandir/man1/condor_compile.1.gz
+%_mandir/man1/condor_config_bind.1.gz
+%_mandir/man1/condor_convert_history.1.gz
 %_mandir/man1/condor_configure.1.gz
 %_mandir/man1/condor_config_val.1.gz
+%_mandir/man1/condor_dagman.1.gz
+%_mandir/man1/condor_fetchlog.1.gz
 %_mandir/man1/condor_findhost.1.gz
 %_mandir/man1/condor_glidein.1.gz
 %_mandir/man1/condor_history.1.gz
 %_mandir/man1/condor_hold.1.gz
+%_mandir/man1/condor_load_history.1.gz
 %_mandir/man1/condor_master.1.gz
 %_mandir/man1/condor_master_off.1.gz
 %_mandir/man1/condor_off.1.gz
@@ -306,13 +306,17 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_store_cred.1.gz
 %_mandir/man1/condor_submit.1.gz
 %_mandir/man1/condor_submit_dag.1.gz
+%_mandir/man1/condor_transfer_data.1.gz
 %_mandir/man1/condor_updates_stats.1.gz
 %_mandir/man1/condor_userlog.1.gz
 %_mandir/man1/condor_userprio.1.gz
 %_mandir/man1/condor_vacate.1.gz
 %_mandir/man1/condor_vacate_job.1.gz
+%_mandir/man1/condor_version.1.gz
+%_mandir/man1/condor_wait.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
 %_bindir/condor
+%_bindir/condor_glidein
 %_bindir/condor_load_history
 %_bindir/condor_submit_dag
 %_bindir/condor_checkpoint
@@ -395,6 +399,10 @@ rm -rf %{buildroot}
 %_sbindir/filelock_midwife
 %_sbindir/filelock_undertaker
 %_sbindir/install_release
+%_sbindir/condor_gridmanager
+%_sbindir/grid_monitor.sh
+%_sbindir/gt4_gahp
+%_sbindir/unicore_gahp
 # sbin/uniq_pid_command is a link for uniq_pid_midwife/undertaker
 %_sbindir/uniq_pid_midwife
 %_sbindir/uniq_pid_undertaker
@@ -443,6 +451,15 @@ fi
 
 
 %changelog
+* Wed Aug  6 2008  <mfarrellee@redhat> - 7.0.4-1
+- Updated to 7.0.4 source
+- Stopped using condor_configure in install step
+
+* Tue Jun 10 2008  <mfarrellee@redhat> - 7.0.2-1
+- Updated to 7.0.2 source
+- Updated config, specifically HOSTALLOW_WRITE, for Personal Condor setup
+- Added condor_config.generic
+
 * Mon Apr  7 2008  <mfarrellee@redhat> - 7.0.0-8
 - Modified init script to be off by default, resolves bz441279
 
