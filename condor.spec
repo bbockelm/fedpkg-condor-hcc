@@ -1,6 +1,6 @@
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.0.4
+Version: 7.0.5
 Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -16,8 +16,9 @@ URL: http://www.cs.wisc.edu/condor/
 #   06eec3ae274b66d233ad050a047f3c91  condor_src-7.0.0-all-all.tar.gz
 #   b08743cfa2e87adbcda042896e8ef537  condor_src-7.0.2-all-all.tar.gz
 #   5f326ad522b63eacf34c6c563cf46910  condor_src-7.0.4-all-all.tar.gz
+#   73323100c5b2259f3b9c042fa05451e0  condor_src-7.0.5-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.0.4-95033-RH.tar.gz
+Source0: condor-7.0.5-105846-RH.tar.gz
 Source1: generate-tarball.sh
 Patch0: condor_config.generic.patch
 Patch2: GLibCFlag28.patch
@@ -453,6 +454,9 @@ fi
 
 
 %changelog
+* Wed Oct  8 2008  <matt@redhat> - 7.0.5-1
+- Rebased on 7.0.5, security update
+
 * Wed Aug  6 2008  <mfarrellee@redhat> - 7.0.4-1
 - Updated to 7.0.4 source
 - Stopped using condor_configure in install step
