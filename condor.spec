@@ -22,7 +22,7 @@ Source0: condor-7.0.5-105846-RH.tar.gz
 Source1: generate-tarball.sh
 Patch0: condor_config.generic.patch
 Patch2: GLibCFlag28.patch
-Patch3: DetectGCC431.patch
+Patch3: DetectGCC432.patch
 Patch4: autoconf-relax-quoting.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
