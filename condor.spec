@@ -1,6 +1,6 @@
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.0.5
+Version: 7.2.0
 Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -17,37 +17,39 @@ URL: http://www.cs.wisc.edu/condor/
 #   b08743cfa2e87adbcda042896e8ef537  condor_src-7.0.2-all-all.tar.gz
 #   5f326ad522b63eacf34c6c563cf46910  condor_src-7.0.4-all-all.tar.gz
 #   73323100c5b2259f3b9c042fa05451e0  condor_src-7.0.5-all-all.tar.gz
+#   a2dd96ea537b2c6d105b6c8dad563ddc  condor_src-7.2.0-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.0.5-105846-RH.tar.gz
+Source0: condor-7.2.0-121001-RH.tar.gz
 Source1: generate-tarball.sh
+Source2: NOTICE.txt
 Patch0: condor_config.generic.patch
-Patch2: GLibCFlag28.patch
-Patch3: DetectGCC432.patch
-Patch4: autoconf-relax-quoting.patch
+Patch1: stdsoap2.h.patch.patch
+Patch2: DetectGCC.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires: imake
 BuildRequires: flex
 BuildRequires: byacc
-BuildRequires: tcsh
 BuildRequires: pcre-devel
 BuildRequires: postgresql-devel
 BuildRequires: openssl-devel
 BuildRequires: krb5-devel
-BuildRequires: gsoap-devel >= 2.7.10-2
+BuildRequires: gsoap-devel >= 2.7.12-1
 BuildRequires: bind-utils
 BuildRequires: m4
 BuildRequires: autoconf
 BuildRequires: classads-devel
+BuildRequires: libX11-devel
 
 Requires: pcre
 Requires: postgresql-libs
 Requires: openssl
 Requires: krb5-libs
-Requires: gsoap >= 2.7.10-2
+Requires: gsoap >= 2.7.12-1
 Requires: mailx
 Requires: classads
+Requires: python >= 2.2
 
 Requires(pre): shadow-utils
 
@@ -71,14 +73,26 @@ monitors their progress, and ultimately informs the user upon
 completion.
 
 
-%package static
-Summary: Headers and libraries for interacting with Condor
-Group: Development/System
+#%package static
+#Summary: Headers and libraries for interacting with Condor
+#Group: Development/System
+#Requires: %name = %version-%release
+#
+#
+#%description static
+#Headers and libraries for interacting with Condor and its components.
+
+
+%package kbdd
+Summary: Condor Keyboard Daemon
+Group: Applications/System
 Requires: %name = %version-%release
+Requires: libX11
 
-
-%description static
-Headers and libraries for interacting with Condor and its components.
+%description kbdd
+The condor_kbdd monitors logged in X users for activity. It is only
+useful on systems where no device (e.g. /dev/*) can be used to
+determine console idle time.
 
 
 %pre
@@ -92,10 +106,11 @@ exit 0
 %prep
 %setup -q -n %{name}-%{version}
 
+cp %{SOURCE2} .
+
 %patch0 -p1
+%patch1 -p1
 %patch2 -p1
-%patch3 -p1
-%patch4 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -114,18 +129,22 @@ export USE_OLD_IMAKE
 
 cd src
 ./build_init
-%configure --enable-proper \
+%configure --with-buildid=Fedora-%{version}-%{release} \
+   --enable-proper \
    --disable-full-port \
    --disable-gcc-version-check \
    --disable-glibc-version-check \
    --disable-static \
    --disable-rpm \
+   --enable-kbdd \
+   --disable-hibernation \
+   --disable-lease-manager \
    --without-zlib \
    --with-openssl \
    --with-krb5 \
    --with-postgresql \
    --with-gsoap \
-   --without-classads \
+   --with-classads \
    --with-man=$PWD/../externals/bundles/man/current
 
 # SMP_NUM_JOBS must be set properly to pass -j to make
@@ -148,7 +167,8 @@ function populate {
 rm -rf %{buildroot}
 
 # make public creates release tarballs which we will install
-cd public/v7.0
+oldpwd=$PWD
+cd public/v7.2
 gzip -cd condor-%{version}-*-dynamic-unstripped.tar.gz | tar x
 cd condor-%{version}
 
@@ -157,6 +177,21 @@ PREFIX=%{buildroot}/install
 populate install *
 
 cp $PREFIX/etc/examples/condor_config.generic $PREFIX/etc/condor_config
+
+# the default condor_config file is not architecture aware and thus
+# sets the LIB directory to always be /usr/lib, we want to do better
+# than that. this is, so far, the best place to do this
+# specialization. we strip the "lib" or "lib64" part from _libdir and
+# stick it in the LIB variable in the config.
+LIB=$(echo %{?_libdir} | sed -e 's:/usr/\(.*\):\1:')
+if [ "$LIB" = "%_libdir" ]; then
+  echo "_libdir does not contain /usr, sed expression needs attention"
+  exit 1
+fi
+sed -e "s:^LIB\s*=.*:LIB = \$(RELEASE_DIR)/$LIB/condor:" \
+  $PREFIX/etc/examples/condor_config.generic \
+  > $PREFIX/etc/condor_config
+
 
 mkdir $PREFIX/local_dir
 mkdir -m1777 $PREFIX/local_dir/execute
@@ -191,9 +226,117 @@ rm $PREFIX/sbin/condor_vacate
 # the libcondorapi.so is not properly created, instead of providing it
 # we will provide the .a version in a static package
 rm $PREFIX/lib/libcondorapi.so
-# sbin/condor and uniq_pid_command are pointless hard links
+# sbin/condor is a pointless hard links
 rm $PREFIX/sbin/condor
+
+# not packaging the condor_startd_factory right now
+rm $PREFIX/sbin/condor_startd_factory
+rm $PREFIX/lib/webservice/condorStartdFactory.wsdl
+rm $PREFIX/libexec/bgp_available_partitions
+rm $PREFIX/libexec/bgp_back_partition
+rm $PREFIX/libexec/bgp_boot_partition
+rm $PREFIX/libexec/bgp_destroy_partition
+rm $PREFIX/libexec/bgp_generate_partition
+rm $PREFIX/libexec/bgp_query_work_loads
+rm $PREFIX/libexec/bgp_shutdown_partition
+
+# not packaging uninteresting WSDL files, except for the master
+rm $PREFIX/lib/webservice/condorCgahp.wsdl
+rm $PREFIX/lib/webservice/condorDagman.wsdl
+rm $PREFIX/lib/webservice/condorDbmsd.wsdl
+rm $PREFIX/lib/webservice/condorDcskel.wsdl
+rm $PREFIX/lib/webservice/condorEventd.wsdl
+rm $PREFIX/lib/webservice/condorGridmanager.wsdl
+rm $PREFIX/lib/webservice/condorHad.wsdl
+rm $PREFIX/lib/webservice/condorJobRouter.wsdl
+rm $PREFIX/lib/webservice/condorKbdd.wsdl
+rm $PREFIX/lib/webservice/condorNegotiator.wsdl
+rm $PREFIX/lib/webservice/condorShadow.wsdl
+rm $PREFIX/lib/webservice/condorStartd.wsdl
+rm $PREFIX/lib/webservice/condorStarter.wsdl
+rm $PREFIX/lib/webservice/condorTransferd.wsdl
+rm $PREFIX/lib/webservice/condorTt.wsdl
+rm $PREFIX/lib/webservice/condorVMgahp.wsdl
+
+
+# not packaging glexec support right now
+rm $PREFIX/libexec/condor_glexec_cleanup
+rm $PREFIX/libexec/condor_glexec_job_wrapper
+rm $PREFIX/libexec/condor_glexec_kill
+rm $PREFIX/libexec/condor_glexec_run
+rm $PREFIX/libexec/condor_glexec_setup
+# not shipping gt42 gahp right now
+rm $PREFIX/sbin/gt42_gahp
+
+# not going to package the sc2005 negotiator
+#rm $PREFIX/sbin/condor_lease_manager
+
+# not going to package these until we know what they are
+rm $PREFIX/bin/condor_power
+rm $PREFIX/sbin/condor_set_shutdown
+
+# not packaging glidein support, depends on globus
+rm $PREFIX/man/man1/condor_glidein.1
+rm $PREFIX/bin/condor_glidein
+
+# not packaging deployment tools
+# sbin/uniq_pid_command is a link for uniq_pid_midwife/undertaker
 rm $PREFIX/sbin/uniq_pid_command
+rm $PREFIX/sbin/uniq_pid_midwife
+rm $PREFIX/sbin/uniq_pid_undertaker
+rm $PREFIX/sbin/cleanup_release
+rm $PREFIX/sbin/condor_local_stop
+rm $PREFIX/sbin/condor_cleanup_local
+rm $PREFIX/sbin/condor_cold_start
+rm $PREFIX/sbin/condor_cold_stop
+rm $PREFIX/sbin/condor_config_bind
+rm $PREFIX/sbin/filelock_midwife
+rm $PREFIX/sbin/filelock_undertaker
+rm $PREFIX/sbin/condor_install_local
+rm $PREFIX/sbin/condor_local_start
+rm $PREFIX/sbin/install_release
+rm $PREFIX/lib/Execute.pm
+rm $PREFIX/lib/FileLock.pm
+rm $PREFIX/man/man1/condor_config_bind.1
+rm $PREFIX/man/man1/condor_cold_start.1
+rm $PREFIX/man/man1/condor_cold_stop.1
+
+# not packaging the ckpt server
+rm $PREFIX/sbin/condor_ckpt_server
+
+# not packaging standard universe
+rm $PREFIX/bin/condor_checkpoint
+rm $PREFIX/sbin/condor_shadow.std
+rm $PREFIX/sbin/condor_starter.std
+rm $PREFIX/bin/condor_compile
+rm $PREFIX/man/man1/condor_compile.1
+rm $PREFIX/man/man1/condor_checkpoint.1
+rm $PREFIX/libexec/condor_ckpt_probe
+
+# not packaging configure/install scripts
+rm $PREFIX/man/man1/condor_configure.1
+rm $PREFIX/sbin/condor_configure
+rm $PREFIX/sbin/condor_install
+
+# not packaging legacy cruft
+rm $PREFIX/man/man1/condor_master_off.1
+rm $PREFIX/sbin/condor_master_off
+rm $PREFIX/man/man1/condor_reconfig_schedd.1
+rm $PREFIX/sbin/condor_reconfig_schedd
+rm $PREFIX/man/man1/condor_convert_history.1
+rm $PREFIX/sbin/condor_convert_history
+
+# not packaging anything globus related
+rm $PREFIX/sbin/condor_gridshell
+rm $PREFIX/sbin/grid_monitor.sh
+rm $PREFIX/sbin/gt4_gahp
+
+# not packaging unsupported gahps
+rm $PREFIX/sbin/unicore_gahp
+
+# not packaging libcondorapi.a
+rm $PREFIX/lib/libcondorapi.a
+
 
 # some scripts are examples but have exec bits set anyway
 chmod a-x $PREFIX/etc/examples/condor.boot
@@ -204,13 +347,16 @@ chmod a-x $PREFIX/etc/examples/mp1script
 populate %_mandir/man1 $PREFIX/man/man1/*
 populate %_bindir $PREFIX/bin/*
 populate %_sbindir $PREFIX/sbin/*
-populate %_usrsrc $PREFIX/src/chirp
 populate %_sysconfdir/condor $PREFIX/etc/condor_config
-populate %_includedir/condor $PREFIX/include/*
-populate %_libdir $PREFIX/lib/libcondorapi.a
+# no -static package
+#populate %_usrsrc $PREFIX/src/chirp
+#populate %_includedir/condor $PREFIX/include/*
+#populate %_libdir $PREFIX/lib/libcondorapi.a
 populate %_datadir/condor $PREFIX/lib/*
+populate %_datadir/condor/sql $PREFIX/sql/*
 populate %_libexecdir/condor $PREFIX/libexec/*
 populate %_var/lib/condor $PREFIX/local_dir/*
+
 
 # install the lsb init script
 install -Dp -m0755 $PREFIX/etc/examples/condor.init %buildroot/%_initrddir/condor
@@ -243,54 +389,35 @@ rm -rf %{buildroot}
 %_datadir/condor/CondorJavaInfo.class
 %_datadir/condor/CondorJavaWrapper.class
 %_datadir/condor/Condor.pm
-%_datadir/condor/Execute.pm
-%_datadir/condor/FileLock.pm
 %_datadir/condor/scimark2lib.jar
 %dir %_datadir/condor/webservice/
-%_datadir/condor/webservice/condorAccountant.wsdl
-%_datadir/condor/webservice/condorCgahp.wsdl
 %_datadir/condor/webservice/condorCollector.wsdl
-%_datadir/condor/webservice/condorDagman.wsdl
-%_datadir/condor/webservice/condorDbmsd.wsdl
-%_datadir/condor/webservice/condorDcskel.wsdl
-%_datadir/condor/webservice/condorEventd.wsdl
-%_datadir/condor/webservice/condorGridmanager.wsdl
-%_datadir/condor/webservice/condorHad.wsdl
 %_datadir/condor/webservice/condorMaster.wsdl
-%_datadir/condor/webservice/condorNegotiator.wsdl
 %_datadir/condor/webservice/condorSchedd.wsdl
-%_datadir/condor/webservice/condorShadow.wsdl
-%_datadir/condor/webservice/condorStartd.wsdl
-%_datadir/condor/webservice/condorStarter.wsdl
-%_datadir/condor/webservice/condorTransferd.wsdl
-%_datadir/condor/webservice/condorVMgahp.wsdl
+%dir %_datadir/condor/sql/
+%_datadir/condor/sql/common_createddl.sql
+%_datadir/condor/sql/oracle_createddl.sql
+%_datadir/condor/sql/oracle_dropddl.sql
+%_datadir/condor/sql/pgsql_createddl.sql
+%_datadir/condor/sql/pgsql_dropddl.sql
 %dir %_libexecdir/condor/
 %_libexecdir/condor/condor_chirp
 %_libexecdir/condor/condor_ssh
 %_libexecdir/condor/sshd.sh
-%_libexecdir/condor/condor_ckpt_probe
+%_libexecdir/condor/condor_job_router
 %_libexecdir/condor/gridftp_wrapper.sh
 %_mandir/man1/condor_advertise.1.gz
-%_mandir/man1/condor_checkpoint.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
 %_mandir/man1/condor_chirp.1.gz
 %_mandir/man1/condor_cod.1.gz
-%_mandir/man1/condor_cold_start.1.gz
-%_mandir/man1/condor_cold_stop.1.gz
-%_mandir/man1/condor_compile.1.gz
-%_mandir/man1/condor_config_bind.1.gz
-%_mandir/man1/condor_convert_history.1.gz
-%_mandir/man1/condor_configure.1.gz
 %_mandir/man1/condor_config_val.1.gz
 %_mandir/man1/condor_dagman.1.gz
 %_mandir/man1/condor_fetchlog.1.gz
 %_mandir/man1/condor_findhost.1.gz
-%_mandir/man1/condor_glidein.1.gz
 %_mandir/man1/condor_history.1.gz
 %_mandir/man1/condor_hold.1.gz
 %_mandir/man1/condor_load_history.1.gz
 %_mandir/man1/condor_master.1.gz
-%_mandir/man1/condor_master_off.1.gz
 %_mandir/man1/condor_off.1.gz
 %_mandir/man1/condor_on.1.gz
 %_mandir/man1/condor_preen.1.gz
@@ -298,7 +425,6 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_q.1.gz
 %_mandir/man1/condor_qedit.1.gz
 %_mandir/man1/condor_reconfig.1.gz
-%_mandir/man1/condor_reconfig_schedd.1.gz
 %_mandir/man1/condor_release.1.gz
 %_mandir/man1/condor_reschedule.1.gz
 %_mandir/man1/condor_restart.1.gz
@@ -319,10 +445,8 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_wait.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
 %_bindir/condor
-%_bindir/condor_glidein
 %_bindir/condor_load_history
 %_bindir/condor_submit_dag
-%_bindir/condor_checkpoint
 %_bindir/condor_prio
 %_bindir/condor_transfer_data
 %_bindir/condor_check_userlogs
@@ -331,7 +455,6 @@ rm -rf %{buildroot}
 %_bindir/condor_cod
 %_bindir/condor_qedit
 %_bindir/condor_userlog
-%_bindir/condor_compile
 %_bindir/condor_release
 %_bindir/condor_userlog_job_counter
 %_bindir/condor_config_val
@@ -342,6 +465,9 @@ rm -rf %{buildroot}
 %_bindir/condor_vacate
 %_bindir/condor_dump_history
 %_bindir/condor_run
+%_bindir/condor_router_history
+%_bindir/condor_router_q
+%_bindir/condor_router_rm
 %_bindir/condor_vacate_job
 %_bindir/condor_findhost
 %_bindir/condor_stats
@@ -351,31 +477,17 @@ rm -rf %{buildroot}
 %_bindir/condor_wait
 %_bindir/condor_hold
 %_bindir/condor_submit
-%_sbindir/cleanup_release
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
 %_sbindir/condor_advertise
 %_sbindir/condor_c-gahp
 %_sbindir/condor_c-gahp_worker_thread
-%_sbindir/condor_ckpt_server
-%_sbindir/condor_cleanup_local
-%_sbindir/condor_cold_start
-%_sbindir/condor_cold_stop
 %_sbindir/condor_collector
-%_sbindir/condor_config_bind
-%_sbindir/condor_configure
-%_sbindir/condor_convert_history
 %_sbindir/condor_dbmsd
 %_sbindir/condor_fetchlog
-%_sbindir/condor_gridshell
 %_sbindir/condor_had
 %_sbindir/condor_init
-%_sbindir/condor_install
-%_sbindir/condor_install_local
-%_sbindir/condor_local_start
-%_sbindir/condor_local_stop
 %_sbindir/condor_master
-%_sbindir/condor_master_off
 %_sbindir/condor_negotiator
 %_sbindir/condor_off
 %_sbindir/condor_on
@@ -383,32 +495,21 @@ rm -rf %{buildroot}
 %_sbindir/condor_procd
 %_sbindir/condor_quill
 %_sbindir/condor_reconfig
-%_sbindir/condor_reconfig_schedd
 %_sbindir/condor_replication
 %_sbindir/condor_restart
 %_sbindir/condor_root_switchboard
 %_sbindir/condor_schedd
 %_sbindir/condor_shadow
-%_sbindir/condor_shadow.std
 %_sbindir/condor_startd
 %_sbindir/condor_starter
-%_sbindir/condor_starter.std
 %_sbindir/condor_store_cred
 %_sbindir/condor_transferd
 %_sbindir/condor_updates_stats
 %_sbindir/condor_vm-gahp
+%_sbindir/amazon_gahp
 %_sbindir/condor_vm_vmware.pl
 %_sbindir/condor_vm_xen.sh
-%_sbindir/filelock_midwife
-%_sbindir/filelock_undertaker
-%_sbindir/install_release
 %_sbindir/condor_gridmanager
-%_sbindir/grid_monitor.sh
-%_sbindir/gt4_gahp
-%_sbindir/unicore_gahp
-# sbin/uniq_pid_command is a link for uniq_pid_midwife/undertaker
-%_sbindir/uniq_pid_midwife
-%_sbindir/uniq_pid_undertaker
 %config(noreplace) %_var/lib/condor/condor_config.local
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
@@ -417,26 +518,37 @@ rm -rf %{buildroot}
 %dir %_var/lib/condor/spool/
 
 
-%files static
+#%files static
+#%defattr(-,root,root,-)
+#%doc LICENSE-2.0.txt
+#%_libdir/libcondorapi.a
+#%dir %_includedir/condor/
+#%_includedir/condor/condor_constants.h
+#%_includedir/condor/condor_event.h
+#%_includedir/condor/condor_holdcodes.h
+#%_includedir/condor/file_lock.h
+#%_includedir/condor/user_log.c++.h
+#%doc %_includedir/condor/user_log.README
+#%dir %_usrsrc/chirp/
+#%_usrsrc/chirp/chirp_client.c
+#%_usrsrc/chirp/chirp_client.h
+#%_usrsrc/chirp/chirp_protocol.h
+
+
+%files kbdd
 %defattr(-,root,root,-)
-%doc LICENSE-2.0.txt
-%_libdir/libcondorapi.a
-%dir %_includedir/condor/
-%_includedir/condor/condor_constants.h
-%_includedir/condor/condor_event.h
-%_includedir/condor/condor_holdcodes.h
-%_includedir/condor/file_lock.h
-%_includedir/condor/user_log.c++.h
-%doc %_includedir/condor/user_log.README
-%dir %_usrsrc/chirp/
-%_usrsrc/chirp/chirp_client.c
-%_usrsrc/chirp/chirp_client.h
-%_usrsrc/chirp/chirp_protocol.h
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sbindir/condor_kbdd
 
 
 %post -n condor
 /sbin/chkconfig --add condor
 /sbin/ldconfig
+test -x /usr/sbin/selinuxenabled && /usr/sbin/selinuxenabled
+if [ $? = 0 ]; then
+   semanage fcontext -a -t unconfined_execmem_exec_t %_sbindir/condor_startd 
+   restorecon  %_sbindir/condor_startd
+fi
 
 
 %preun -n condor
@@ -454,14 +566,19 @@ fi
 
 
 %changelog
+* Wed Jan  7 2009  <matt@redhat> - 7.2.0-1
+- Upgraded to 7.2.0 release
+- Removed -static package
+- Added Fedora specific buildid
+- Enabled KBDD, daemon to monitor X usage on systems with only USB devs
+- Updated install process
+
 * Wed Oct  8 2008  <matt@redhat> - 7.0.5-1
 - Rebased on 7.0.5, security update
 
 * Wed Aug  6 2008  <mfarrellee@redhat> - 7.0.4-1
 - Updated to 7.0.4 source
 - Stopped using condor_configure in install step
-- Patched aclocal.m4 to handle autoconf 2.62
-- Patched configure.ac to handle gcc-4.3.1
 
 * Tue Jun 10 2008  <mfarrellee@redhat> - 7.0.2-1
 - Updated to 7.0.2 source

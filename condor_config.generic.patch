@@ -1,8 +1,66 @@
 diff --git a/src/condor_examples/condor_config.generic b/src/condor_examples/condor_config.generic
-index c119679..e795a15 100644
+index f3f60a5..94c146f 100644
 --- a/src/condor_examples/condor_config.generic
 +++ b/src/condor_examples/condor_config.generic
-@@ -51,19 +51,16 @@
+@@ -1,15 +1,35 @@
+ ######################################################################
++######################################################################
++##                                                                  ##
++##  N O T I C E:                                                    ##
++##                                                                  ##
++##       Customization of this file should be done via the          ##
++##       LOCAL_CONFIG_FILE.                                         ##
++##                                                                  ##
++######################################################################
++######################################################################
++
++
++######################################################################
+ ##
+ ##  condor_config
+ ##
+ ##  This is the global configuration file for condor.  Any settings
+-##  made here may potentially be overridden in the local configuration
+-##  file.  KEEP THAT IN MIND!  To double-check that a variable is
+-##  getting set from the configuration file that you expect, use
+-##  condor_config_val -v <variable name>
++##  found here * * s h o u l d   b e   c u s t o m i z e d   i n
++##  t h e   l o c a l   c o n f i g u r a t i o n   f i l e. * *
++##
++##  The local configuration file is specified by LOCAL_CONFIG_FILE
++##  below.
++##
++##  For a basic configuration, you may only want to start by
++##  customizing CONDOR_ADMIN.
++##
++##  Note: To double-check where a configuration variable is set from
++##  you can use condor_config_val -v <variable name>,
++##  e.g. condor_config_val -v CONDOR_ADMIN.
+ ##
+ ##  The file is divided into four main parts:
+-##  Part 1:  Settings you MUST customize 
++##  Part 1:  Settings you likely want to customize 
+ ##  Part 2:  Settings you may want to customize
+ ##  Part 3:  Settings that control the policy of when condor will
+ ##           start and stop jobs on your machines
+@@ -21,11 +41,6 @@
+ ##  various settings in here and possible ways to configure your
+ ##  pool. 
+ ##
+-##  If you are installing Condor as root and then handing over the
+-##  administration of this file to a person you do not trust with
+-##  root access, please read the Installation chapter paying careful
+-##  note to the condor_config.root entries.
+-##
+ ##  Unless otherwise specified, settings that are commented out show
+ ##  the defaults that are used if you don't define a value.  Settings
+ ##  that are defined here MUST BE DEFINED since they have no default
+@@ -47,18 +62,15 @@
+ ##  #        #    #  #   #      #              #
+ ##  #        #    #  #    #     #            #####
+ ##
+-##  Part 1:  Settings you must customize:
++##  Part 1:  Settings you likely want to customize:
  ######################################################################
  ######################################################################
  
@@ -18,13 +76,25 @@ index c119679..e795a15 100644
  
  ##  Where is the local condor directory for each host?  
  ##  This is where the local config file(s), logs and
- ##  spool/execute directories are located
--LOCAL_DIR		= $(TILDE)
-+LOCAL_DIR		= /var/lib/condor
- #LOCAL_DIR		= $(RELEASE_DIR)/hosts/$(HOSTNAME)
+@@ -72,7 +84,7 @@ LOCAL_CONFIG_FILE	= $(LOCAL_DIR)/condor_config.local
  
- ##  Where is the machine-specific local config file for each host?
-@@ -93,13 +90,13 @@ MAIL			= /usr/bin/mail
+ ## If the local config file is not present, is it an error?
+ ## WARNING: This is a potential security issue. 
+-## If not specificed, te default is True
++## If not specificed, the default is True
+ #REQUIRE_LOCAL_CONFIG_FILE = TRUE
+ 
+ ##--------------------------------------------------------------------
+@@ -84,7 +96,7 @@ CONDOR_ADMIN		= condor-admin@your.domain
+ 
+ ##  Full path to a mail delivery program that understands that "-s"
+ ##  means you want to specify a subject:
+-MAIL			= /usr/bin/mail
++MAIL			= /bin/mail
+ 
+ ##--------------------------------------------------------------------
+ ##  Network domain parameters:
+@@ -93,13 +105,13 @@ MAIL			= /usr/bin/mail
  ##  machines don't share a common UID space, set it to 
  ##  UID_DOMAIN = $(FULL_HOSTNAME)
  ##  to specify that each machine has its own UID space.
@@ -40,7 +110,7 @@ index c119679..e795a15 100644
  
  ##  This macro is used to specify a short description of your pool. 
  ##  It should be about 20 characters long. For example, the name of 
-@@ -218,7 +215,7 @@ HOSTALLOW_READ = *
+@@ -218,7 +230,7 @@ HOSTALLOW_READ = *
  ##    HOSTALLOW_WRITE = *
  ##  but note that this will allow anyone to submit jobs or add
  ##  machines to your pool and is serious security risk.
@@ -49,17 +119,61 @@ index c119679..e795a15 100644
  #HOSTALLOW_WRITE = *.your.domain, your-friend's-machine.other.domain
  #HOSTDENY_WRITE = bad-machine.your.domain
  
-@@ -859,10 +856,10 @@ LOG		= $(LOCAL_DIR)/log
- SPOOL		= $(LOCAL_DIR)/spool
+@@ -231,10 +243,9 @@ HOSTALLOW_NEGOTIATOR = $(CONDOR_HOST)
+ HOSTALLOW_NEGOTIATOR_SCHEDD = $(CONDOR_HOST), $(FLOCK_NEGOTIATOR_HOSTS)
+ 
+ ##  Config access.  Machines listed here can use the condor_config_val
+-##  tool to modify all daemon configurations except those specified in
+-##  the condor_config.root file.  This level of host-wide access
+-##  should only be granted with extreme caution.  By default, config
+-##  access is denied from all hosts.
++##  tool to modify all daemon configurations.  This level of host-wide
++##  access should only be granted with extreme caution.  By default,
++##  config access is denied from all hosts.
+ #HOSTALLOW_CONFIG = trusted-host.your.domain
+ 
+ ##  Flocking Configs.  These are the real things that Condor looks at,
+@@ -872,9 +883,10 @@ SPOOL		= $(LOCAL_DIR)/spool
  EXECUTE		= $(LOCAL_DIR)/execute
  BIN		= $(RELEASE_DIR)/bin
--LIB		= $(RELEASE_DIR)/lib
+ LIB		= $(RELEASE_DIR)/lib
 -INCLUDE		= $(RELEASE_DIR)/include
-+LIB		= $(RELEASE_DIR)/share/condor
 +INCLUDE		= $(RELEASE_DIR)/include/condor
  SBIN		= $(RELEASE_DIR)/sbin
 -LIBEXEC		= $(RELEASE_DIR)/libexec
 +LIBEXEC		= $(RELEASE_DIR)/libexec/condor
++SHARE		= $(RELEASE_DIR)/share/condor
  
  ## If you leave HISTORY undefined (comment it out), no history file
  ## will be created. 
+@@ -1655,7 +1667,7 @@ JAVA_MAXHEAP_ARGUMENT = -Xmx
+ ## them here.  However, do not remove the existing entries, as Condor
+ ## needs them.
+ 
+-JAVA_CLASSPATH_DEFAULT = $(LIB) $(LIB)/scimark2lib.jar .
++JAVA_CLASSPATH_DEFAULT = $(SHARE) $(SHARE)/scimark2lib.jar .
+ 
+ ##  JAVA_CLASSPATH_ARGUMENT describes the command-line parameter
+ ##  used to introduce a new classpath:
+@@ -2299,7 +2311,7 @@ LeaseManager			= $(SBIN)/condor_lease_manager
+ # Turn on the lease manager
+ #DAEMON_LIST			= $(DAEMON_LIST), LeaseManager
+ 
+-# The identification and location of the quill daemon for local clients.
++# The identification and location of the lease manager for local clients.
+ LeaseManger_ADDRESS_FILE	= $(LOG)/.lease_manager_address
+ 
+ ## LeaseManager startup arguments
+diff --git a/src/condor_examples/customize b/src/condor_examples/customize
+index b1c5710..cb2dea1 100644
+--- a/src/condor_examples/customize
++++ b/src/condor_examples/customize
+@@ -54,7 +54,7 @@ sub get_platform_defaults {
+     $_ = $os;
+   SWITCH: {
+       if(/^Linux/) { 
+-	  $mail_path="/usr/bin/mail";
++	  $mail_path="/bin/mail";
+ 	  $ps_path="/bin/ps auwx";
+ 	  $console_devs="mouse, console";
+ 	  last SWITCH;
