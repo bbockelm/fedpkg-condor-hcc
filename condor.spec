@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.2.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -60,6 +60,8 @@ Requires(postun):/sbin/service
 
 #Provides: user(condor) = 43
 #Provides: group(condor) = 43
+
+Obsoletes: condor-static < 7.2.0
 
 
 %description
@@ -199,6 +201,7 @@ mkdir -m0755 $PREFIX/local_dir/log
 mkdir -m0755 $PREFIX/local_dir/spool
 
 cat >> $PREFIX/local_dir/condor_config.local << EOF
+CONDOR_DEVELOPERS = NONE
 CONDOR_HOST = \$(FULL_HOSTNAME)
 COLLECTOR_NAME = Personal Condor
 START = TRUE
@@ -566,6 +569,10 @@ fi
 
 
 %changelog
+* Thu Jan  8 2009  <matt@redhat> - 7.2.0-2
+- (Re)added CONDOR_DEVELOPERS=NONE to the default condor_config.local
+- Added missing Obsoletes for condor-static (thanks Michael Schwendt)
+
 * Wed Jan  7 2009  <matt@redhat> - 7.2.0-1
 - Upgraded to 7.2.0 release
 - Removed -static package
