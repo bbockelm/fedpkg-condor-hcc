@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.2.0
-Release: 3%{?dist}
+Release: 4%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -571,7 +571,10 @@ fi
 
 
 %changelog
-* Mon Jan 14 2009  <matt@redhat> - 7.2.0-3
+* Thu Jan 15 2009 Tomas Mraz <tmraz@redhat.com> - 7.2.0-4
+- rebuild with new openssl
+
+* Wed Jan 14 2009  <matt@redhat> - 7.2.0-3
 - Fixed regression: initscript was on by default, now off again
 
 * Thu Jan  8 2009  <matt@redhat> - 7.2.0-2
