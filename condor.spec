@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.2.0
-Release: 2%{?dist}
+Release: 3%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -25,6 +25,7 @@ Source2: NOTICE.txt
 Patch0: condor_config.generic.patch
 Patch1: stdsoap2.h.patch.patch
 Patch2: DetectGCC.patch
+Patch3: chkconfig_off.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -113,6 +114,7 @@ cp %{SOURCE2} .
 %patch0 -p1
 %patch1 -p1
 %patch2 -p1
+%patch3 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -569,6 +571,9 @@ fi
 
 
 %changelog
+* Mon Jan 14 2009  <matt@redhat> - 7.2.0-3
+- Fixed regression: initscript was on by default, now off again
+
 * Thu Jan  8 2009  <matt@redhat> - 7.2.0-2
 - (Re)added CONDOR_DEVELOPERS=NONE to the default condor_config.local
 - Added missing Obsoletes for condor-static (thanks Michael Schwendt)
