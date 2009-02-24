@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.2.0
-Release: 5%{?dist}
+Version: 7.2.1
+Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -18,14 +18,15 @@ URL: http://www.cs.wisc.edu/condor/
 #   5f326ad522b63eacf34c6c563cf46910  condor_src-7.0.4-all-all.tar.gz
 #   73323100c5b2259f3b9c042fa05451e0  condor_src-7.0.5-all-all.tar.gz
 #   a2dd96ea537b2c6d105b6c8dad563ddc  condor_src-7.2.0-all-all.tar.gz
+#   edbac8267130ac0a0e016d0f113b4616  condor_src-7.2.1-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.2.0-121001-RH.tar.gz
+Source0: condor-7.2.1-133382-RH.tar.gz
 Source1: generate-tarball.sh
 Source2: NOTICE.txt
 Patch0: condor_config.generic.patch
 Patch1: stdsoap2.h.patch.patch
-Patch2: DetectGCC.patch
 Patch3: chkconfig_off.patch
+Patch4: no_rpmdb_query.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -43,13 +44,8 @@ BuildRequires: autoconf
 BuildRequires: classads-devel
 BuildRequires: libX11-devel
 
-Requires: pcre
-Requires: postgresql-libs
-Requires: openssl
-Requires: krb5-libs
 Requires: gsoap >= 2.7.12-1
 Requires: mailx
-Requires: classads
 Requires: python >= 2.2
 
 Requires(pre): shadow-utils
@@ -113,8 +109,8 @@ cp %{SOURCE2} .
 
 %patch0 -p1
 %patch1 -p1
-%patch2 -p1
 %patch3 -p1
+%patch4 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -571,13 +567,13 @@ fi
 
 
 %changelog
-* Tue Feb 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.2.0-5
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_11_Mass_Rebuild
+* Mon Feb 23 2009  <matt@redhat> - 7.2.1-1
+- Upgraded to 7.2.1 release
+- Pruned changes accepted upstream from condor_config.generic.patch
+- Removed Requires in favor of automatic dependencies on SONAMEs
+- Added no_rmpdb_query.patch to avoid rpm -q during a build
 
-* Thu Jan 15 2009 Tomas Mraz <tmraz@redhat.com> - 7.2.0-4
-- rebuild with new openssl
-
-* Wed Jan 14 2009  <matt@redhat> - 7.2.0-3
+* Mon Jan 14 2009  <matt@redhat> - 7.2.0-3
 - Fixed regression: initscript was on by default, now off again
 
 * Thu Jan  8 2009  <matt@redhat> - 7.2.0-2
