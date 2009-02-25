@@ -571,7 +571,7 @@ fi
 
 
 %changelog
-* Mon Feb 23 2009  <matt@redhat> - 7.2.1-1
+* Mon Feb 25 2009  <matt@redhat> - 7.2.1-1
 - Upgraded to 7.2.1 release
 - Pruned changes accepted upstream from condor_config.generic.patch
 - Removed Requires in favor of automatic dependencies on SONAMEs
