@@ -28,7 +28,7 @@ Patch1: stdsoap2.h.patch.patch
 Patch3: chkconfig_off.patch
 Patch4: no_rpmdb_query.patch
 Patch5: no_basename.patch
-Patch6: const_strchr.patch
+Patch6: gcc44_const.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -576,6 +576,12 @@ fi
 - Pruned changes accepted upstream from condor_config.generic.patch
 - Removed Requires in favor of automatic dependencies on SONAMEs
 - Added no_rmpdb_query.patch to avoid rpm -q during a build
+
+* Tue Feb 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.2.0-5
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_11_Mass_Rebuild
+
+* Thu Jan 15 2009 Tomas Mraz <tmraz@redhat.com> - 7.2.0-4
+- rebuild with new openssl
 
 * Mon Jan 14 2009  <matt@redhat> - 7.2.0-3
 - Fixed regression: initscript was on by default, now off again
