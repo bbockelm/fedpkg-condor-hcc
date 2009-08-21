@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.2.1
-Release: 2%{?dist}
+Release: 3%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -571,6 +571,9 @@ fi
 
 
 %changelog
+* Fri Aug 21 2009 Tomas Mraz <tmraz@redhat.com> - 7.2.1-3
+- rebuilt with new openssl
+
 * Fri Jul 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.2.1-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_12_Mass_Rebuild
 
