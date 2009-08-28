@@ -29,6 +29,7 @@ Patch1: stdsoap2.h.patch.patch
 Patch3: chkconfig_off.patch
 Patch4: no_rpmdb_query.patch
 Patch5: no_basename.patch
+Patch6: log_lock_run.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -114,6 +115,7 @@ cp %{SOURCE2} .
 %patch3 -p1
 %patch4 -p1
 %patch5 -p1
+%patch6 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -360,7 +362,9 @@ populate %_datadir/condor $PREFIX/lib/*
 populate %_datadir/condor/sql $PREFIX/sql/*
 populate %_libexecdir/condor $PREFIX/libexec/*
 populate %_var/lib/condor $PREFIX/local_dir/*
-
+mkdir -p -m0755 "%{buildroot}"/%_var/run/condor
+mkdir -p -m0755 "%{buildroot}"/%_var/log/condor
+mkdir -p -m0755 "%{buildroot}"/%_var/lock/condor
 
 # install the lsb init script
 install -Dp -m0755 $PREFIX/etc/examples/condor.init %buildroot/%_initrddir/condor
@@ -455,7 +459,7 @@ rm -rf %{buildroot}
 %_bindir/condor_transfer_data
 %_bindir/condor_check_userlogs
 %_bindir/condor_q
-%_bindir/condor_transferer
+%_sbindir/condor_transferer
 %_bindir/condor_cod
 %_bindir/condor_qedit
 %_bindir/condor_userlog
@@ -518,8 +522,10 @@ rm -rf %{buildroot}
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
-%dir %_var/lib/condor/log/
+%dir %_var/log/condor/
 %dir %_var/lib/condor/spool/
+%dir %_var/lock/condor/
+%dir %_var/run/condor/
 
 
 #%files static
@@ -550,7 +556,7 @@ rm -rf %{buildroot}
 /sbin/ldconfig
 test -x /usr/sbin/selinuxenabled && /usr/sbin/selinuxenabled
 if [ $? = 0 ]; then
-   semanage fcontext -a -t unconfined_execmem_exec_t %_sbindir/condor_startd 
+   semanage fcontext -a -t unconfined_execmem_exec_t %_sbindir/condor_startd 2>&1| grep -v "already defined"
    restorecon  %_sbindir/condor_startd
 fi
 
@@ -573,6 +579,8 @@ fi
 * Fri Aug 28 2009  <matt@redhat> - 7.2.4-1
 - Upgrade to 7.2.4 release
 - Removed gcc44_const.patch, accepted upstream
+- New log, lock, run locations (BZ502175)
+- Filtered innocuous semanage message
 
 * Fri Aug 21 2009 Tomas Mraz <tmraz@redhat.com> - 7.2.1-3
 - rebuilt with new openssl
