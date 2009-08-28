@@ -29,7 +29,6 @@ Patch1: stdsoap2.h.patch.patch
 Patch3: chkconfig_off.patch
 Patch4: no_rpmdb_query.patch
 Patch5: no_basename.patch
-Patch6: gcc44_const.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -115,7 +114,6 @@ cp %{SOURCE2} .
 %patch3 -p1
 %patch4 -p1
 %patch5 -p1
-%patch6 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -574,6 +572,7 @@ fi
 %changelog
 * Fri Aug 28 2009  <matt@redhat> - 7.2.4-1
 - Upgrade to 7.2.4 release
+- Removed gcc44_const.patch, accepted upstream
 
 * Fri Aug 21 2009 Tomas Mraz <tmraz@redhat.com> - 7.2.1-3
 - rebuilt with new openssl
