@@ -1,6 +1,6 @@
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.2.4
+Version: 7.4.2
 Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -20,16 +20,18 @@ URL: http://www.cs.wisc.edu/condor/
 #   a2dd96ea537b2c6d105b6c8dad563ddc  condor_src-7.2.0-all-all.tar.gz
 #   edbac8267130ac0a0e016d0f113b4616  condor_src-7.2.1-all-all.tar.gz
 #   6d9b0ef74d575623af11e396fa274174  condor_src-7.2.4-all-all.tar.gz
+#   ee72b65fad02d21af0dc8f1aa5872110  condor_src-7.4.0-all-all.tar.gz
+#   d4deeabbbce65980c085d8bea4c1018a  condor_src-7.4.1-all-all.tar.gz
+#   4714086f58942b78cf03fef9ccb1117c  condor_src-7.4.2-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.2.4-159529-RH.tar.gz
+Source0: condor-7.4.2-227044-RH.tar.gz
 Source1: generate-tarball.sh
-Source2: NOTICE.txt
 Patch0: condor_config.generic.patch
 Patch1: stdsoap2.h.patch.patch
 Patch3: chkconfig_off.patch
-Patch4: no_rpmdb_query.patch
-Patch5: no_basename.patch
 Patch6: log_lock_run.patch
+Patch7: only_dynamic_unstripped.patch
+Patch10: dso_link_change.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -41,13 +43,14 @@ BuildRequires: postgresql-devel
 BuildRequires: openssl-devel
 BuildRequires: krb5-devel
 BuildRequires: gsoap-devel >= 2.7.12-1
+BuildRequires: libvirt-devel
 BuildRequires: bind-utils
 BuildRequires: m4
 BuildRequires: autoconf
-BuildRequires: classads-devel
+BuildRequires: classads-devel >= 1.0.4
 BuildRequires: libX11-devel
 
-Requires: gsoap >= 2.7.12-1
+Requires: gsoap >= 2.7.12
 Requires: mailx
 Requires: python >= 2.2
 
@@ -97,6 +100,17 @@ useful on systems where no device (e.g. /dev/*) can be used to
 determine console idle time.
 
 
+%package vm-gahp
+Summary: Condor's VM Gahp
+Group: Applications/System
+Requires: %name = %version-%release
+
+%description vm-gahp
+The condor_vm-gahp enables the Virtual Machine Universe feature of
+Condor. The VM Universe uses libvirt to start and control VMs under
+Condor's Startd.
+
+
 %pre
 getent group condor >/dev/null || groupadd -r condor
 getent passwd condor >/dev/null || \
@@ -108,14 +122,12 @@ exit 0
 %prep
 %setup -q -n %{name}-%{version}
 
-cp %{SOURCE2} .
-
 %patch0 -p1
 %patch1 -p1
 %patch3 -p1
-%patch4 -p1
-%patch5 -p1
 %patch6 -p1
+%patch7 -p1
+%patch10 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -135,6 +147,7 @@ export USE_OLD_IMAKE
 cd src
 ./build_init
 %configure --with-buildid=Fedora-%{version}-%{release} \
+   --with-platform=$(uname -s)-$(uname -p) \
    --enable-proper \
    --disable-full-port \
    --disable-gcc-version-check \
@@ -144,9 +157,11 @@ cd src
    --enable-kbdd \
    --disable-hibernation \
    --disable-lease-manager \
+   --disable-hdfs \
    --without-zlib \
    --with-openssl \
    --with-krb5 \
+   --with-libvirt \
    --with-postgresql \
    --with-gsoap \
    --with-classads \
@@ -173,7 +188,7 @@ rm -rf %{buildroot}
 
 # make public creates release tarballs which we will install
 oldpwd=$PWD
-cd public/v7.2
+cd public/v7.4
 gzip -cd condor-%{version}-*-dynamic-unstripped.tar.gz | tar x
 cd condor-%{version}
 
@@ -263,7 +278,9 @@ rm $PREFIX/lib/webservice/condorStarter.wsdl
 rm $PREFIX/lib/webservice/condorTransferd.wsdl
 rm $PREFIX/lib/webservice/condorTt.wsdl
 rm $PREFIX/lib/webservice/condorVMgahp.wsdl
-
+rm $PREFIX/lib/webservice/condorRooster.wsdl
+rm $PREFIX/lib/webservice/condorTest.wsdl
+rm $PREFIX/lib/webservice/condorSoapshell.wsdl
 
 # not packaging glexec support right now
 rm $PREFIX/libexec/condor_glexec_cleanup
@@ -398,6 +415,7 @@ rm -rf %{buildroot}
 %_datadir/condor/CondorJavaWrapper.class
 %_datadir/condor/Condor.pm
 %_datadir/condor/scimark2lib.jar
+%_datadir/condor/condor_ssh_to_job_sshd_config_template
 %dir %_datadir/condor/webservice/
 %_datadir/condor/webservice/condorCollector.wsdl
 %_datadir/condor/webservice/condorMaster.wsdl
@@ -414,6 +432,12 @@ rm -rf %{buildroot}
 %_libexecdir/condor/sshd.sh
 %_libexecdir/condor/condor_job_router
 %_libexecdir/condor/gridftp_wrapper.sh
+%_libexecdir/condor/condor_glexec_update_proxy
+%_libexecdir/condor/condor_limits_wrapper.sh
+%_libexecdir/condor/condor_rooster
+%_libexecdir/condor/condor_ssh_to_job_shell_setup
+%_libexecdir/condor/condor_ssh_to_job_sshd_setup
+%_libexecdir/condor/power_state
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
 %_mandir/man1/condor_chirp.1.gz
@@ -485,6 +509,7 @@ rm -rf %{buildroot}
 %_bindir/condor_wait
 %_bindir/condor_hold
 %_bindir/condor_submit
+%_bindir/condor_ssh_to_job
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
 %_sbindir/condor_advertise
@@ -513,10 +538,7 @@ rm -rf %{buildroot}
 %_sbindir/condor_store_cred
 %_sbindir/condor_transferd
 %_sbindir/condor_updates_stats
-%_sbindir/condor_vm-gahp
 %_sbindir/amazon_gahp
-%_sbindir/condor_vm_vmware.pl
-%_sbindir/condor_vm_xen.sh
 %_sbindir/condor_gridmanager
 %config(noreplace) %_var/lib/condor/condor_config.local
 %defattr(-,condor,condor,-)
@@ -551,12 +573,21 @@ rm -rf %{buildroot}
 %_sbindir/condor_kbdd
 
 
+%files vm-gahp
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sbindir/condor_vm-gahp
+%_sbindir/condor_vm_vmware.pl
+%_sbindir/condor_vm_xen.sh
+%_libexecdir/condor/libvirt_simple_script.awk
+
+
 %post -n condor
 /sbin/chkconfig --add condor
 /sbin/ldconfig
 test -x /usr/sbin/selinuxenabled && /usr/sbin/selinuxenabled
 if [ $? = 0 ]; then
-   semanage fcontext -a -t unconfined_execmem_exec_t %_sbindir/condor_startd 2>&1| grep -v "already defined"
+   semanage fcontext -a -t unconfined_execmem_exec_t %_sbindir/condor_startd
    restorecon  %_sbindir/condor_startd
 fi
 
@@ -576,6 +607,26 @@ fi
 
 
 %changelog
+* Wed Apr 21 2010  <matt@redhat> - 7.4.2-1
+- Upgrade to 7.4.2 release
+
+* Tue Jan  5 2010  <matt@redhat> - 7.4.1-1
+- Upgrade to 7.4.1 release
+- Upstreamed: guess_version_from_release_dir, fix_platform_check
+- Security update (BZ549577)
+
+* Fri Dec  4 2009  <matt@redhat> - 7.4.0-1
+- Upgrade to 7.4.0 release
+- Fixed POSTIN error (BZ540439)
+- Removed NOTICE.txt source, now provided by upstream
+- Removed no_rpmdb_query.patch, applied upstream
+- Removed no_basename.patch, applied upstream
+- Added only_dynamic_unstripped.patch to reduce build time
+- Added guess_version_from_release_dir.patch, for previous
+- Added fix_platform_check.patch
+- Use new --with-platform, to avoid modification of make_final_tarballs
+- Introduced vm-gahp package to hold libvirt deps
+
 * Fri Aug 28 2009  <matt@redhat> - 7.2.4-1
 - Upgrade to 7.2.4 release
 - Removed gcc44_const.patch, accepted upstream

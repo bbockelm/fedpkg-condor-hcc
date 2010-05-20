@@ -5,8 +5,8 @@ diff -ru condor-7.2.0/src/condor_examples/condor.init condor-7.2.0mf/src/condor_
  #
  # condor	This script allows for starting and stopping Condor.
  #
--# chkconfig: 2345 90 10
-+# chkconfig: - 90 10
+-# chkconfig: 2345 98 10
++# chkconfig: - 98 10
  # description: Condor is a high throughput computing batch processing
  # 	       platform.
  # processname: condor_master

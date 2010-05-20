@@ -89,15 +89,9 @@ index f3f60a5..94c146f 100644
  
  ##  This macro is used to specify a short description of your pool. 
  ##  It should be about 20 characters long. For example, the name of 
-@@ -218,7 +230,7 @@ HOSTALLOW_READ = *
- ##    HOSTALLOW_WRITE = *
- ##  but note that this will allow anyone to submit jobs or add
- ##  machines to your pool and is serious security risk.
--HOSTALLOW_WRITE = YOU_MUST_CHANGE_THIS_INVALID_CONDOR_CONFIGURATION_VALUE
-+HOSTALLOW_WRITE = $(FULL_HOSTNAME)
- #HOSTALLOW_WRITE = *.your.domain, your-friend's-machine.other.domain
- #HOSTDENY_WRITE = bad-machine.your.domain
- 
+@@ -214,1 +231,1 @@
+-ALLOW_WRITE = YOU_MUST_CHANGE_THIS_INVALID_CONDOR_CONFIGURATION_VALUE
++ALLOW_WRITE = $(FULL_HOSTNAME)
 @@ -872,9 +883,10 @@ SPOOL		= $(LOCAL_DIR)/spool
  EXECUTE		= $(LOCAL_DIR)/execute
  BIN		= $(RELEASE_DIR)/bin

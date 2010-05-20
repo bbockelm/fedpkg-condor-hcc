@@ -1,0 +1,23 @@
+commit f075415e311b24a75f434b6540f68e493141e37d
+Author: Matthew Farrellee <matt@redhat.com>
+Date:   Thu May 20 17:14:17 2010 -0400
+
+    Updated proper build for Fedora 13, DSO ld change requires explicit linking of dep deps
+    
+    https://fedoraproject.org/wiki/UnderstandingDSOLinkChange
+
+diff --git a/src/configure.ac b/src/configure.ac
+index 3a892e2..645edb8 100644
+--- a/src/configure.ac
++++ b/src/configure.ac
+@@ -3002,7 +3002,9 @@ fi
+ 
+ CHECK_EXTERNAL([krb5], [1.4.3-p0], [soft],
+                [use krb5 (provides Kerberos support)],
+-               MF_LIB_CHECK([krb5], [[krb5 krb5_free_principal]]))
++               MF_LIB_CHECK([krb5], [[krb5 krb5_free_principal],
++	       			     [k5crypto krb5_c_encrypt],
++				     [com_err error_message]]))
+ 
+ CHECK_EXTERNAL([openssl], [0.9.8h-p2], [soft],
+                [use OpenSSL (provides authentication and encryption support)],
