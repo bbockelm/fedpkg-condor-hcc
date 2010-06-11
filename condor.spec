@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.4.2
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -32,6 +32,8 @@ Patch3: chkconfig_off.patch
 Patch6: log_lock_run.patch
 Patch7: only_dynamic_unstripped.patch
 Patch10: dso_link_change.patch
+Patch11: gsoap-2.7.16-wsseapi.patch
+Patch12: gsoap-2.7.16-dom.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -128,6 +130,8 @@ exit 0
 %patch6 -p1
 %patch7 -p1
 %patch10 -p1
+%patch11 -p1
+%patch12 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -607,6 +611,11 @@ fi
 
 
 %changelog
+* Fri Jun 11 2010  <matt@redhat> - 7.4.2-2
+- Rebuild for classads DSO version change (1:0:0)
+- Updated stdsoap2.h.patch.patch for gsoap 2.7.16
+- Added gsoap-2.7.16-wsseapi/dom.patch for gsoap 2.7.16
+
 * Wed Apr 21 2010  <matt@redhat> - 7.4.2-1
 - Upgrade to 7.4.2 release
 
