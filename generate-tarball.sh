@@ -25,9 +25,6 @@ echo "...recording BUILD-ID: $build"
 
 for f in \
     src/condor_mail \
-    src/condor_vm-gahp/cygwin1.dll \
-    src/condor_vm-gahp/mkisofs.exe \
-    config/CONDOR_TEST_LRG \
     src/condor_tests/job_vmu_basic.sh \
     src/condor_tests/job_vmu_cdrom.run \
     src/condor_tests/job_vmu_cdrom.sh \
@@ -40,12 +37,9 @@ for f in \
     src/condor_tests/x_vm_utils.pm \
     src/condor_tests/x_param.vmware \
     src/condor_tests/x_vmware_test_vm.cmd \
-    src/condor_tests/x_vmware_test_vm.tar.gz \
     src/condor_tests/x_vmware_configpostsrc \
-    config/CONDOR_TEST_CNFDTL \
     src/condor_tests/job_ligo_x86-64-chkpttst.cmd \
     src/condor_tests/job_ligo_x86-64-chkpttst.run \
-    src/condor_tests/x_job_ligo_x86-64-chkpttst.tar.gz \
     src/condor_tests/job_quill_basic.cmd \
     src/condor_tests/job_quill_basic.pl \
     src/condor_tests/job_quill_basic.run \
