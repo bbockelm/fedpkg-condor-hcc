@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.4.2
-Release: 2%{?dist}
+Version: 7.4.4
+Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -23,15 +23,15 @@ URL: http://www.cs.wisc.edu/condor/
 #   ee72b65fad02d21af0dc8f1aa5872110  condor_src-7.4.0-all-all.tar.gz
 #   d4deeabbbce65980c085d8bea4c1018a  condor_src-7.4.1-all-all.tar.gz
 #   4714086f58942b78cf03fef9ccb1117c  condor_src-7.4.2-all-all.tar.gz
+#   2b7e7687cba85d0cf0774f9126b51779  condor_src-7.4.3-all-all.tar.gz
+#   108a4b91cd10deca1554ca1088be6c8c  condor_src-7.4.4-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.4.2-227044-RH.tar.gz
+Source0: condor-7.4.4-279383-RH.tar.gz
 Source1: generate-tarball.sh
 Patch0: condor_config.generic.patch
-Patch1: stdsoap2.h.patch.patch
 Patch3: chkconfig_off.patch
 Patch6: log_lock_run.patch
 Patch7: only_dynamic_unstripped.patch
-Patch10: dso_link_change.patch
 Patch11: gsoap-2.7.16-wsseapi.patch
 Patch12: gsoap-2.7.16-dom.patch
 
@@ -125,11 +125,9 @@ exit 0
 %setup -q -n %{name}-%{version}
 
 %patch0 -p1
-%patch1 -p1
 %patch3 -p1
 %patch6 -p1
 %patch7 -p1
-%patch10 -p1
 %patch11 -p1
 %patch12 -p1
 
@@ -611,6 +609,14 @@ fi
 
 
 %changelog
+* Thu Jan 13 2011 <matt@redhat> - 7.4.4-1
+- Upgrade to 7.4.4 release
+- Upstreamed: stdsoap2.h.patch.patch
+
+* Mon Aug 23 2010  <matt@redhat> - 7.4.3-1
+- Upgrade to 7.4.3 release
+- Upstreamed: dso_link_change
+
 * Fri Jun 11 2010  <matt@redhat> - 7.4.2-2
 - Rebuild for classads DSO version change (1:0:0)
 - Updated stdsoap2.h.patch.patch for gsoap 2.7.16
