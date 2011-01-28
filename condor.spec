@@ -130,7 +130,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 
 
 %build
-%cmake .
+%cmake
 make %{?_smp_mflags}
 
 
