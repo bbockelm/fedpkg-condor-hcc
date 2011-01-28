@@ -60,10 +60,10 @@ do
     rm -r $f;
 done;
 
-echo "...removing all externals except 'man'"
-mv externals/bundles/man externals/
-rm -r externals/bundles/*
-mv externals/man externals/bundles/
+#echo "...removing all externals except 'man'"
+#mv externals/bundles/man externals/
+#rm -r externals/bundles/*
+#mv externals/man externals/bundles/
 
 echo "...creating condor-$1-$build-RH.tar.gz"
 cd ..
