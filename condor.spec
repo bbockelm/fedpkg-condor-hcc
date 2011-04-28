@@ -1,7 +1,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.5.5
-Release: 2%{?dist}
+Version: 7.6.0
+Release: 1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -26,8 +26,9 @@ URL: http://www.cs.wisc.edu/condor/
 #   2b7e7687cba85d0cf0774f9126b51779  condor_src-7.4.3-all-all.tar.gz
 #   108a4b91cd10deca1554ca1088be6c8c  condor_src-7.4.4-all-all.tar.gz
 #   b482c4bfa350164427a1952113d53d03  condor_src-7.5.5-all-all.tar.gz
+#   2a1355cb24a56a71978d229ddc490bc5  condor_src-7.6.0-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.5.5-308936-RH.tar.gz
+Source0: condor-7.6.0-327697-RH.tar.gz
 Source1: generate-tarball.sh
 Patch0: condor_config.generic.patch
 Patch3: chkconfig_off.patch
@@ -520,6 +521,9 @@ fi
 
 
 %changelog
+* Thu Apr 28 2011 <matt@redhat> - 7.6.0-1
+- Upgrade to 7.6.0 release
+
 * Tue Feb 08 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.5.5-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
 
