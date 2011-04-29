@@ -38,22 +38,27 @@ Patch4: 7.6.1-catch_up.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
-BuildRequires: cmake
-BuildRequires: flex
-BuildRequires: byacc
+BuildRequires: %_bindir/cmake
+BuildRequires: %_bindir/flex
+BuildRequires: %_bindir/byacc
 BuildRequires: pcre-devel
-BuildRequires: postgresql-devel
+#BuildRequires: postgresql-devel
 BuildRequires: openssl-devel
 BuildRequires: krb5-devel
-BuildRequires: gsoap-devel >= 2.7.12-1
+#BuildRequires: gsoap-devel >= 2.7.12-1
 BuildRequires: libvirt-devel
 BuildRequires: bind-utils
 BuildRequires: m4
-BuildRequires: autoconf
+#BuildRequires: autoconf
 BuildRequires: libX11-devel
+BuildRequires: wso2-wsf-cpp-devel
+BuildRequires: wso2-axis2-devel
+BuildRequires: /usr/include/curl/curl.h
+BuildRequires: /usr/include/expat.h
+#BuildRequires: qpid-qmf-devel
 #BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
 
-Requires: gsoap >= 2.7.12
+#Requires: gsoap >= 2.7.12
 Requires: mailx
 Requires: python >= 2.2
 Requires: condor-classads = %{version}-%{release}
