@@ -1,7 +1,9 @@
+%define tarball_version 7.6.0
+
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.6.0
-Release: 1%{?dist}
+Version: 7.6.1
+Release: 0.1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -32,7 +34,7 @@ Source0: condor-7.6.0-327697-RH.tar.gz
 Source1: generate-tarball.sh
 Patch0: condor_config.generic.patch
 Patch3: chkconfig_off.patch
-Patch6: log_lock_run.patch
+Patch4: 7.6.1-catch_up.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -49,10 +51,12 @@ BuildRequires: bind-utils
 BuildRequires: m4
 BuildRequires: autoconf
 BuildRequires: libX11-devel
+#BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
 
 Requires: gsoap >= 2.7.12
 Requires: mailx
 Requires: python >= 2.2
+Requires: condor-classads = %{version}-%{release}
 
 Requires(pre): shadow-utils
 
@@ -88,11 +92,34 @@ completion.
 #Headers and libraries for interacting with Condor and its components.
 
 
+#%package qmf
+#Summary: Condor QMF components
+#Group: Applications/System
+#Requires: %name = %version-%release
+##Requires: qmf >= %{qmf_version}
+#Requires: python-qmf >= 0.7.946106
+#Requires: condor-classads = %{version}-%{release}
+#Obsoletes: condor-qmf-plugins
+#
+#%description qmf
+#Components to connect Condor to the QMF management bus.
+
+
+%package aviary
+Summary: Condor Aviary components
+Group: Applications/System
+Requires: %name = %version-%release
+Requires: condor-classads = %{version}-%{release}
+
+%description aviary
+Components to provide simplified WS interface to Condor.
+
+
 %package kbdd
 Summary: Condor Keyboard Daemon
 Group: Applications/System
 Requires: %name = %version-%release
-Requires: libX11
+Requires: condor-classads = %{version}-%{release}
 
 %description kbdd
 The condor_kbdd monitors logged in X users for activity. It is only
@@ -104,11 +131,62 @@ determine console idle time.
 Summary: Condor's VM Gahp
 Group: Applications/System
 Requires: %name = %version-%release
+Requires: libvirt
+Requires: condor-classads = %{version}-%{release}
 
 %description vm-gahp
 The condor_vm-gahp enables the Virtual Machine Universe feature of
 Condor. The VM Universe uses libvirt to start and control VMs under
 Condor's Startd.
+
+
+#%package deltacloud-gahp
+#Summary: Condor's Deltacloud Gahp
+#Group: Applications/System
+#Requires: %name = %version-%release
+#
+#%description deltacloud-gahp
+#The deltacloud_gahp enables Condor's ability to manage jobs run on
+#resources exposed by the deltacloud API.
+
+
+%package classads
+Summary: Condor's classified advertisement language
+Group: Development/Libraries
+Obsoletes: classads <= 1.0.8
+Obsoletes: classads-static <= 1.0.8
+
+%description classads
+Classified Advertisements (classads) are the lingua franca of
+Condor. They are used for describing jobs, workstations, and other
+resources. They are exchanged by Condor processes to schedule
+jobs. They are logged to files for statistical and debugging
+purposes. They are used to enquire about current state of the system.
+
+A classad is a mapping from attribute names to expressions. In the
+simplest cases, the expressions are simple constants (integer,
+floating point, or string). A classad is thus a form of property
+list. Attribute expressions can also be more complicated. There is a
+protocol for evaluating an attribute expression of a classad vis a vis
+another ad. For example, the expression "other.size > 3" in one ad
+evaluates to true if the other ad has an attribute named size and the
+value of that attribute is (or evaluates to) an integer greater than
+three. Two classads match if each ad has an attribute requirements
+that evaluates to true in the context of the other ad. Classad
+matching is used by the Condor central manager to determine the
+compatibility of jobs and workstations where they may be run.
+
+
+%package classads-devel
+Summary: Headers for Condor's classified advertisement language
+Group: Development/System
+Requires: %name-classads = %version-%release
+Requires: pcre-devel
+Obsoletes: classads-devel <= 1.0.8
+
+%description classads-devel
+Header files for Condor's ClassAd Library, a powerful and flexible,
+semi-structured representation of data.
 
 
 %pre
@@ -120,18 +198,36 @@ exit 0
 
 
 %prep
-%setup -q -n %{name}-%{version}
+%setup -q -n %{name}-%{tarball_version}
 
 %patch0 -p1
 %patch3 -p1
-%patch6 -p1
+%patch4 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 
 
 %build
-%cmake
+%cmake -DNO_PHONE_HOME:BOOL=TRUE \
+       -DHAVE_BACKFILL:BOOL=FALSE \
+       -DHAVE_BOINC:BOOL=FALSE \
+       -DWITH_GSOAP:BOOL=FALSE \
+       -DWITH_POSTGRESQL:BOOL=FALSE \
+       -DHAVE_KBDD:BOOL=TRUE \
+       -DHAVE_HIBERNATION:BOOL=TRUE \
+       -DWANT_LEASE_MANAGER:BOOL=FALSE \
+       -DWANT_HDFS:BOOL=FALSE \
+       -DWANT_QUILL:BOOL=FALSE \
+       -DWITH_ZLIB:BOOL=FALSE \
+       -DWANT_CONTRIB:BOOL=ON \
+       -DWITH_MANAGEMENT:BOOL=FALSE \
+       -DWITH_AVIARY:BOOL=TRUE \
+       -DWITH_TRIGGERD:BOOL=FALSE \
+       -DWANT_FULL_DEPLOYMENT:BOOL=FALSE \
+       -DWANT_GLEXEC:BOOL=FALSE \
+       -DWITH_LIBDELTACLOUD:BOOL=FALSE \
+       -DWITH_GLOBUS:BOOL=FALSE
 make %{?_smp_mflags}
 
 
@@ -149,6 +245,16 @@ make install DESTDIR=%{buildroot}
 
 # The install target puts etc/ under usr/, let's fix that.
 mv %{buildroot}/usr/etc %{buildroot}/%{_sysconfdir}
+
+populate %_sysconfdir/condor %{buildroot}/%{_usr}/lib/condor_ssh_to_job_sshd_config_template
+
+# Things in /usr/lib really belong in /usr/share/condor
+populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
+# Except for libclassad
+populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
+rm -f %{buildroot}/%{_datadir}/condor/libclassads.a
+
+populate %{_libdir}/condor/plugins %{buildroot}/%{_usr}/libexec/*-plugin.so
 
 # It is proper to put Condor specific libexec binaries under libexec/condor/
 populate %_libexecdir/condor %{buildroot}/usr/libexec/*
@@ -175,9 +281,24 @@ sed -e "s:^LIB\s*=.*:LIB = \$(RELEASE_DIR)/$LIB/condor:" \
   %{buildroot}/etc/examples/condor_config.generic \
   > %{buildroot}/%{_sysconfdir}/condor/condor_config
 
+# Install the basic configuration, a Personal Condor config. Allows for
+# yum install condor + service condor start and go.
+mkdir -m0755 %{buildroot}/%{_sysconfdir}/condor/config.d
+cp %{buildroot}/etc/examples/condor_config.local %{buildroot}/%{_sysconfdir}/condor/config.d/00personal_condor.config
+
+# Install condor-qmf's base plugin configuration
+#populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/60condor-qmf.config
+# Install condor-aviary's base plugin configuration
+populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/61aviary.config
+
+mkdir -p %{buildroot}/%{_var}/lib/condor/aviary
+populate %{_var}/lib/condor/aviary %{buildroot}/usr/axis2.xml
+populate %{_var}/lib/condor/aviary %{buildroot}/usr/services/
+
 mkdir -p -m0755 %{buildroot}/%{_var}/run/condor
 mkdir -p -m0755 %{buildroot}/%{_var}/log/condor
 mkdir -p -m0755 %{buildroot}/%{_var}/lock/condor
+mkdir -p -m1777 %{buildroot}/%{_var}/lock/condor/local
 mkdir -p -m0755 %{buildroot}/%{_sharedstatedir}/condor/spool
 mkdir -p -m1777 %{buildroot}/%{_sharedstatedir}/condor/execute
 
@@ -196,63 +317,14 @@ EOF
 # this gets around a bug whose fix is not yet merged
 echo "TRUST_UID_DOMAIN = TRUE" >> %{buildroot}/%{_sharedstatedir}/condor/condor_config.local
 
-# used by BLAHP, which is not packaged
-rm -r %{buildroot}/%{_libexecdir}/condor/glite
-rm -r %{buildroot}/%{_datarootdir}/condor/glite
-# used by old MPI universe, not packaged (it's rsh, it should die)
-rm %{buildroot}/%{_libexecdir}/condor/rsh
-# this is distributed as chirp_client.c/h and chirp_protocol.h in %_usrsrc
-rm %{buildroot}/%{_datarootdir}/condor/libchirp_client.a
-# which we're not distributing atm either
-rm -r %{buildroot}/%{_usrsrc}/chirp
-
-# not packaging the condor_startd_factory right now
-rm %{buildroot}/%{_sbindir}/condor_startd_factory
-rm -r %{buildroot}/%{_usrsrc}/startd_factory
-rm %{buildroot}/%{_libexecdir}/condor/bgp_available_partitions
-rm %{buildroot}/%{_libexecdir}/condor/bgp_back_partition
-rm %{buildroot}/%{_libexecdir}/condor/bgp_boot_partition
-rm %{buildroot}/%{_libexecdir}/condor/bgp_destroy_partition
-rm %{buildroot}/%{_libexecdir}/condor/bgp_generate_partition
-rm %{buildroot}/%{_libexecdir}/condor/bgp_query_work_loads
-rm %{buildroot}/%{_libexecdir}/condor/bgp_shutdown_partition
-
-# not packaging glexec support right now
-rm %{buildroot}/%{_libexecdir}/condor/condor_glexec_cleanup
-rm %{buildroot}/%{_libexecdir}/condor/condor_glexec_job_wrapper
-rm %{buildroot}/%{_libexecdir}/condor/condor_glexec_kill
-rm %{buildroot}/%{_libexecdir}/condor/condor_glexec_run
-rm %{buildroot}/%{_libexecdir}/condor/condor_glexec_setup
-
-# not going to package the sc2005 negotiator
-rm %{buildroot}/%{_sbindir}/condor_lease_manager
-
 # no master shutdown program for now
 rm %{buildroot}/%{_sbindir}/condor_set_shutdown
 rm %{buildroot}/%{_mandir}/man1/condor_set_shutdown.1.gz
 
 # not packaging glidein support, depends on globus
 rm %{buildroot}/%{_mandir}/man1/condor_glidein.1.gz
-rm %{buildroot}/%{_bindir}/condor_glidein
 
 # not packaging deployment tools
-# sbin/uniq_pid_command is a link for uniq_pid_midwife/undertaker
-rm %{buildroot}/%{_sbindir}/uniq_pid_command
-rm %{buildroot}/%{_sbindir}/uniq_pid_midwife
-rm %{buildroot}/%{_sbindir}/uniq_pid_undertaker
-rm %{buildroot}/%{_sbindir}/cleanup_release
-rm %{buildroot}/%{_sbindir}/condor_local_stop
-rm %{buildroot}/%{_sbindir}/condor_cleanup_local
-rm %{buildroot}/%{_sbindir}/condor_cold_start
-rm %{buildroot}/%{_sbindir}/condor_cold_stop
-rm %{buildroot}/%{_sbindir}/condor_config_bind
-rm %{buildroot}/%{_sbindir}/filelock_midwife
-rm %{buildroot}/%{_sbindir}/filelock_undertaker
-rm %{buildroot}/%{_sbindir}/condor_install_local
-rm %{buildroot}/%{_sbindir}/condor_local_start
-rm %{buildroot}/%{_sbindir}/install_release
-rm %{buildroot}/%{_datarootdir}/condor/Execute.pm
-rm %{buildroot}/%{_datarootdir}/condor/FileLock.pm
 rm %{buildroot}/%{_mandir}/man1/condor_config_bind.1.gz
 rm %{buildroot}/%{_mandir}/man1/condor_cold_start.1.gz
 rm %{buildroot}/%{_mandir}/man1/condor_cold_stop.1.gz
@@ -266,31 +338,18 @@ rm %{buildroot}/%{_mandir}/man1/cleanup_release.1.gz
 # not packaging standard universe
 rm %{buildroot}/%{_mandir}/man1/condor_compile.1.gz
 rm %{buildroot}/%{_mandir}/man1/condor_checkpoint.1.gz
-rm -r %{buildroot}/usr/examples
 
 # not packaging configure/install scripts
 rm %{buildroot}/%{_mandir}/man1/condor_configure.1.gz
-rm %{buildroot}/%{_sbindir}/condor_configure
-rm %{buildroot}/%{_sbindir}/condor_install
 
 # not packaging legacy cruft
 rm %{buildroot}/%{_mandir}/man1/condor_master_off.1.gz
-rm %{buildroot}/%{_sbindir}/condor_master_off
 rm %{buildroot}/%{_mandir}/man1/condor_reconfig_schedd.1.gz
-rm %{buildroot}/%{_sbindir}/condor_reconfig_schedd
 rm %{buildroot}/%{_mandir}/man1/condor_convert_history.1.gz
 
-# not packaging anything globus related
-rm %{buildroot}/%{_sbindir}/condor_gridshell
-rm %{buildroot}/%{_sbindir}/grid_monitor.sh
-rm %{buildroot}/%{_sbindir}/gt4_gahp
-rm %{buildroot}/%{_sbindir}/gt42_gahp
-
-# not packaging unsupported gahps
-rm %{buildroot}/%{_sbindir}/unicore_gahp
-
-# not packaging libcondorapi.a
-rm %{buildroot}/%{_datarootdir}/condor/libcondorapi.a
+# not packaging gidd_alloc or procd_ctl
+rm %{buildroot}/%{_mandir}/man1/gidd_alloc.1.gz
+rm %{buildroot}/%{_mandir}/man1/procd_ctl.1.gz
 
 # not packaging quill bits
 rm %{buildroot}/%{_mandir}/man1/condor_load_history.1.gz
@@ -298,18 +357,12 @@ rm %{buildroot}/%{_mandir}/man1/condor_load_history.1.gz
 # Remove junk
 rm -r %{buildroot}/%{_sysconfdir}/sysconfig
 rm -r %{buildroot}/%{_sysconfdir}/init.d
-rm %{buildroot}/usr/DOC
-rm %{buildroot}/usr/INSTALL
-rm %{buildroot}/usr/LICENSE-2.0.txt
-rm %{buildroot}/usr/README
-# No libs, no headers!
-rm -r %{buildroot}/usr/include
 
 # install the lsb init script
 install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
 
 # we must place the config examples in builddir so %doc can find them
-mv %{buildroot}/etc/examples %_builddir/%name-%version
+mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
 
 
 %clean
@@ -334,22 +387,28 @@ rm -rf %{buildroot}
 %_datadir/condor/CondorJavaWrapper.class
 %_datadir/condor/Condor.pm
 %_datadir/condor/scimark2lib.jar
-%_datadir/condor/condor_ssh_to_job_sshd_config_template
-%dir %_datadir/condor/webservice/
-%_datadir/condor/webservice/condorCollector.wsdl
-%_datadir/condor/webservice/condorSchedd.wsdl
+%dir %_sysconfdir/condor/config.d/
+%_sysconfdir/condor/config.d/00personal_condor.config
+%_sysconfdir/condor/condor_ssh_to_job_sshd_config_template
+#%dir %_datadir/condor/webservice/
+#%_datadir/condor/webservice/condorCollector.wsdl
+#%_datadir/condor/webservice/condorSchedd.wsdl
 %dir %_libexecdir/condor/
 %_libexecdir/condor/condor_chirp
 %_libexecdir/condor/condor_ssh
 %_libexecdir/condor/sshd.sh
 %_libexecdir/condor/condor_job_router
 %_libexecdir/condor/gridftp_wrapper.sh
-%_libexecdir/condor/condor_glexec_update_proxy
+#%_libexecdir/condor/condor_glexec_update_proxy
 %_libexecdir/condor/condor_limits_wrapper.sh
 %_libexecdir/condor/condor_rooster
 %_libexecdir/condor/condor_ssh_to_job_shell_setup
 %_libexecdir/condor/condor_ssh_to_job_sshd_setup
 %_libexecdir/condor/power_state
+%_libexecdir/condor/condor_kflops
+%_libexecdir/condor/condor_mips
+%_libexecdir/condor/data_plugin
+%_libexecdir/condor/curl_plugin
 %_libexecdir/condor/condor_shared_port
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
@@ -366,6 +425,7 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_on.1.gz
 %_mandir/man1/condor_preen.1.gz
 %_mandir/man1/condor_prio.1.gz
+%_mandir/man1/condor_procd.1.gz
 %_mandir/man1/condor_q.1.gz
 %_mandir/man1/condor_qedit.1.gz
 %_mandir/man1/condor_reconfig.1.gz
@@ -425,6 +485,7 @@ rm -rf %{buildroot}
 %_bindir/condor_submit
 %_bindir/condor_ssh_to_job
 %_bindir/condor_power
+%_bindir/condor_gather_info
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
 %_sbindir/condor_advertise
@@ -451,9 +512,9 @@ rm -rf %{buildroot}
 %_sbindir/condor_store_cred
 %_sbindir/condor_transferd
 %_sbindir/condor_updates_stats
-%_sbindir/amazon_gahp
+#%_sbindir/amazon_gahp
 %_sbindir/condor_gridmanager
-%_sbindir/condor_credd
+#%_sbindir/condor_credd
 %config(noreplace) %_var/lib/condor/condor_config.local
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
@@ -481,6 +542,46 @@ rm -rf %{buildroot}
 #%_usrsrc/chirp/chirp_protocol.h
 
 
+#%files qmf
+#%defattr(-,root,root,-)
+#%doc LICENSE-2.0.txt NOTICE.txt
+#%_sysconfdir/condor/config.d/60condor-qmf.config
+#%dir %_libdir/condor/plugins
+#%_libdir/condor/plugins/MgmtCollectorPlugin-plugin.so
+#%_libdir/condor/plugins/MgmtMasterPlugin-plugin.so
+#%_libdir/condor/plugins/MgmtNegotiatorPlugin-plugin.so
+#%_libdir/condor/plugins/MgmtScheddPlugin-plugin.so
+#%_libdir/condor/plugins/MgmtStartdPlugin-plugin.so
+#%_bindir/get_trigger_data
+#%_sbindir/condor_trigger_config
+#%_sbindir/condor_triggerd
+#%_sbindir/condor_job_server
+
+
+%files aviary
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sysconfdir/condor/config.d/61aviary.config
+%dir %_libdir/condor/plugins
+%_libdir/condor/plugins/AviaryScheddPlugin-plugin.so
+%_sbindir/aviary_query_server
+%dir %_var/lib/condor/aviary
+%_var/lib/condor/aviary/axis2.xml
+%dir %_var/lib/condor/aviary/services
+%dir %_var/lib/condor/aviary/services/job
+%_var/lib/condor/aviary/services/job/libaviary_job_axis.so
+%_var/lib/condor/aviary/services/job/services.xml
+%_var/lib/condor/aviary/services/job/aviary-common.xsd
+%_var/lib/condor/aviary/services/job/aviary-job.xsd
+%_var/lib/condor/aviary/services/job/aviary-job.wsdl
+%dir %_var/lib/condor/aviary/services/query
+%_var/lib/condor/aviary/services/query/libaviary_query_axis.so
+%_var/lib/condor/aviary/services/query/services.xml
+%_var/lib/condor/aviary/services/query/aviary-common.xsd
+%_var/lib/condor/aviary/services/query/aviary-query.xsd
+%_var/lib/condor/aviary/services/query/aviary-query.wsdl
+
+
 %files kbdd
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
@@ -491,9 +592,60 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
 %_sbindir/condor_vm-gahp
-%_sbindir/condor_vm_vmware.pl
-%_sbindir/condor_vm_xen.sh
+#%_sbindir/condor_vm_vmware.pl
+#%_sbindir/condor_vm_xen.sh
 %_libexecdir/condor/libvirt_simple_script.awk
+
+
+#%files deltacloud-gahp
+#%defattr(-,root,root,-)
+#%doc LICENSE-2.0.txt NOTICE.txt
+#%_sbindir/deltacloud_gahp
+
+
+%files classads
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_libdir/libclassad.so.1
+%_libdir/libclassad.so.1.1.0
+
+%files classads-devel
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_bindir/classad_functional_tester
+%_bindir/classad_version
+%_libdir/libclassad.so
+%dir %_includedir/classad/
+%_includedir/classad/attrrefs.h
+%_includedir/classad/cclassad.h
+%_includedir/classad/classad_distribution.h
+%_includedir/classad/classadErrno.h
+%_includedir/classad/classad.h
+%_includedir/classad/classadItor.h
+%_includedir/classad/classad_stl.h
+%_includedir/classad/collectionBase.h
+%_includedir/classad/collection.h
+%_includedir/classad/common.h
+%_includedir/classad/debug.h
+%_includedir/classad/exprList.h
+%_includedir/classad/exprTree.h
+%_includedir/classad/fnCall.h
+%_includedir/classad/indexfile.h
+%_includedir/classad/lexer.h
+%_includedir/classad/lexerSource.h
+%_includedir/classad/literals.h
+%_includedir/classad/matchClassad.h
+%_includedir/classad/operators.h
+%_includedir/classad/query.h
+%_includedir/classad/sink.h
+%_includedir/classad/source.h
+%_includedir/classad/transaction.h
+%_includedir/classad/util.h
+%_includedir/classad/value.h
+%_includedir/classad/view.h
+%_includedir/classad/xmlLexer.h
+%_includedir/classad/xmlSink.h
+%_includedir/classad/xmlSource.h
 
 
 %post -n condor
@@ -519,10 +671,19 @@ if [ "$1" -ge "1" ]; then
 fi
 /sbin/ldconfig
 
+# Queue -
+# - Introduced condor-qmf, package of the mgmt/qmf contrib
+# - Introduced deltacloud-gahp
 
 %changelog
-* Thu Apr 28 2011 <matt@redhat> - 7.6.0-1
-- Upgrade to 7.6.0 release
+* Thu Apr 28 2011 <matt@redhat> - 7.6.1-0.1
+- Upgrade to 7.6.0 release, pre-release of 7.6.1 at 27972e8
+- Upstreamed patch: log_lock_run.patch
+- Introduced condor-classads to obsolete classads
+- Introduced condor-aviary, package of the aviary contrib
+- Transitioned from LOCAL_CONFIG_FILE to LOCAL_CONFIG_DIR
+- Stopped building against gSOAP,
+-  use aviary over birdbath and ec2_gahp (7.7.0) over amazon_gahp
 
 * Tue Feb 08 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.5.5-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
