@@ -54,7 +54,8 @@ for f in \
     src/condor_tests/x_quill_pgsqlinstall.pl \
     src/condor_tests/x_quill_pgsqlstop.pl \
     src/condor_tests/x_quill_readline-5.2.tar.gz \
-    src/condor_tests/x_quill_readlineinstall.pl;
+    src/condor_tests/x_quill_readlineinstall.pl \
+    condor_src-7.6.0-all-all.tar.gz;
 do
     echo "...removing $f";
     rm -r $f;
