@@ -226,7 +226,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWANT_QUILL:BOOL=FALSE \
        -DWITH_ZLIB:BOOL=FALSE \
        -DWANT_CONTRIB:BOOL=ON \
-       -DWITH_MANAGEMENT:BOOL=FALSE \
+       -DWITH_MANAGEMENT:BOOL=TRUE \
        -DWITH_AVIARY:BOOL=TRUE \
        -DWITH_TRIGGERD:BOOL=FALSE \
        -DWANT_FULL_DEPLOYMENT:BOOL=FALSE \
