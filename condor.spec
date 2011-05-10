@@ -55,8 +55,8 @@ BuildRequires: wso2-wsf-cpp-devel
 BuildRequires: wso2-axis2-devel
 BuildRequires: /usr/include/curl/curl.h
 BuildRequires: /usr/include/expat.h
-#BuildRequires: qpid-qmf-devel
-#BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
+BuildRequires: qpid-qmf-devel
+BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
 
 #Requires: gsoap >= 2.7.12
 Requires: mailx
@@ -97,17 +97,17 @@ completion.
 #Headers and libraries for interacting with Condor and its components.
 
 
-#%package qmf
-#Summary: Condor QMF components
-#Group: Applications/System
-#Requires: %name = %version-%release
-##Requires: qmf >= %{qmf_version}
-#Requires: python-qmf >= 0.7.946106
-#Requires: condor-classads = %{version}-%{release}
-#Obsoletes: condor-qmf-plugins
-#
-#%description qmf
-#Components to connect Condor to the QMF management bus.
+%package qmf
+Summary: Condor QMF components
+Group: Applications/System
+Requires: %name = %version-%release
+#Requires: qmf >= %{qmf_version}
+Requires: python-qmf >= 0.7.946106
+Requires: condor-classads = %{version}-%{release}
+Obsoletes: condor-qmf-plugins
+
+%description qmf
+Components to connect Condor to the QMF management bus.
 
 
 %package aviary
@@ -145,14 +145,14 @@ Condor. The VM Universe uses libvirt to start and control VMs under
 Condor's Startd.
 
 
-#%package deltacloud-gahp
-#Summary: Condor's Deltacloud Gahp
-#Group: Applications/System
-#Requires: %name = %version-%release
-#
-#%description deltacloud-gahp
-#The deltacloud_gahp enables Condor's ability to manage jobs run on
-#resources exposed by the deltacloud API.
+%package deltacloud-gahp
+Summary: Condor's Deltacloud Gahp
+Group: Applications/System
+Requires: %name = %version-%release
+
+%description deltacloud-gahp
+The deltacloud_gahp enables Condor's ability to manage jobs run on
+resources exposed by the deltacloud API.
 
 
 %package classads
@@ -226,12 +226,12 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWANT_QUILL:BOOL=FALSE \
        -DWITH_ZLIB:BOOL=FALSE \
        -DWANT_CONTRIB:BOOL=ON \
-       -DWITH_MANAGEMENT:BOOL=FALSE \
+       -DWITH_MANAGEMENT:BOOL=TRUE \
        -DWITH_AVIARY:BOOL=TRUE \
-       -DWITH_TRIGGERD:BOOL=FALSE \
+       -DWITH_TRIGGERD:BOOL=TRUE \
        -DWANT_FULL_DEPLOYMENT:BOOL=FALSE \
        -DWANT_GLEXEC:BOOL=FALSE \
-       -DWITH_LIBDELTACLOUD:BOOL=FALSE \
+       -DWITH_LIBDELTACLOUD:BOOL=TRUE \
        -DWITH_GLOBUS:BOOL=FALSE
 make %{?_smp_mflags}
 
@@ -269,7 +269,7 @@ mkdir -p %{buildroot}/%{_mandir}
 mv %{buildroot}/usr/man/man1 %{buildroot}/%{_mandir}
 
 # Things in /usr/lib really belong in /usr/share/condor
-mv %{buildroot}/usr/lib %{buildroot}/%{_datarootdir}/condor
+#mv %{buildroot}/usr/lib %{buildroot}/%{_datarootdir}/condor
 
 mkdir -p %{buildroot}/%{_sysconfdir}/condor
 # the default condor_config file is not architecture aware and thus
@@ -292,7 +292,7 @@ mkdir -m0755 %{buildroot}/%{_sysconfdir}/condor/config.d
 cp %{buildroot}/etc/examples/condor_config.local %{buildroot}/%{_sysconfdir}/condor/config.d/00personal_condor.config
 
 # Install condor-qmf's base plugin configuration
-#populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/60condor-qmf.config
+populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/60condor-qmf.config
 # Install condor-aviary's base plugin configuration
 populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/61aviary.config
 
@@ -547,20 +547,20 @@ rm -rf %{buildroot}
 #%_usrsrc/chirp/chirp_protocol.h
 
 
-#%files qmf
-#%defattr(-,root,root,-)
-#%doc LICENSE-2.0.txt NOTICE.txt
-#%_sysconfdir/condor/config.d/60condor-qmf.config
-#%dir %_libdir/condor/plugins
-#%_libdir/condor/plugins/MgmtCollectorPlugin-plugin.so
-#%_libdir/condor/plugins/MgmtMasterPlugin-plugin.so
-#%_libdir/condor/plugins/MgmtNegotiatorPlugin-plugin.so
-#%_libdir/condor/plugins/MgmtScheddPlugin-plugin.so
-#%_libdir/condor/plugins/MgmtStartdPlugin-plugin.so
-#%_bindir/get_trigger_data
-#%_sbindir/condor_trigger_config
-#%_sbindir/condor_triggerd
-#%_sbindir/condor_job_server
+%files qmf
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sysconfdir/condor/config.d/60condor-qmf.config
+%dir %_libdir/condor/plugins
+%_libdir/condor/plugins/MgmtCollectorPlugin-plugin.so
+%_libdir/condor/plugins/MgmtMasterPlugin-plugin.so
+%_libdir/condor/plugins/MgmtNegotiatorPlugin-plugin.so
+%_libdir/condor/plugins/MgmtScheddPlugin-plugin.so
+%_libdir/condor/plugins/MgmtStartdPlugin-plugin.so
+%_bindir/get_trigger_data
+%_sbindir/condor_trigger_config
+%_sbindir/condor_triggerd
+%_sbindir/condor_job_server
 
 
 %files aviary
@@ -602,10 +602,10 @@ rm -rf %{buildroot}
 %_libexecdir/condor/libvirt_simple_script.awk
 
 
-#%files deltacloud-gahp
-#%defattr(-,root,root,-)
-#%doc LICENSE-2.0.txt NOTICE.txt
-#%_sbindir/deltacloud_gahp
+%files deltacloud-gahp
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sbindir/deltacloud_gahp
 
 
 %files classads
@@ -676,16 +676,15 @@ if [ "$1" -ge "1" ]; then
 fi
 /sbin/ldconfig
 
-# Queue -
-# - Introduced condor-qmf, package of the mgmt/qmf contrib
-# - Introduced deltacloud-gahp
 
 %changelog
-* Thu Apr 28 2011 <matt@redhat> - 7.6.1-0.1
-- Upgrade to 7.6.0 release, pre-release of 7.6.1 at 27972e8
+* Tue May 10 2011 <matt@redhat> - 7.6.1-0.1
+- Upgrade to 7.6.0 release, pre-release of 7.6.1 at 5617a464
 - Upstreamed patch: log_lock_run.patch
 - Introduced condor-classads to obsolete classads
 - Introduced condor-aviary, package of the aviary contrib
+- Introduced condor-deltacloud-gahp
+- Introduced condor-qmf, package of the mgmt/qmf contrib
 - Transitioned from LOCAL_CONFIG_FILE to LOCAL_CONFIG_DIR
 - Stopped building against gSOAP,
 -  use aviary over birdbath and ec2_gahp (7.7.0) over amazon_gahp
