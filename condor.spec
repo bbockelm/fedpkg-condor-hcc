@@ -2,7 +2,7 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.6.1
+Version: 7.7.0
 Release: 0.1%{?dist}
 License: ASL 2.0
 Group: Applications/System
@@ -34,7 +34,7 @@ Source0: condor-7.6.0-327697-RH.tar.gz
 Source1: generate-tarball.sh
 Patch0: condor_config.generic.patch
 Patch3: chkconfig_off.patch
-Patch4: 7.6.1-catch_up.patch
+Patch4: 7.7.0-catch_up.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -205,9 +205,9 @@ exit 0
 %prep
 %setup -q -n %{name}-%{tarball_version}
 
-%patch0 -p1
 %patch3 -p1
 %patch4 -p1
+%patch0 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -491,6 +491,7 @@ rm -rf %{buildroot}
 %_bindir/condor_ssh_to_job
 %_bindir/condor_power
 %_bindir/condor_gather_info
+%_bindir/condor_test_match
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
 %_sbindir/condor_advertise
@@ -517,7 +518,7 @@ rm -rf %{buildroot}
 %_sbindir/condor_store_cred
 %_sbindir/condor_transferd
 %_sbindir/condor_updates_stats
-#%_sbindir/amazon_gahp
+%_sbindir/ec2_gahp
 %_sbindir/condor_gridmanager
 #%_sbindir/condor_credd
 %config(noreplace) %_var/lib/condor/condor_config.local
@@ -678,6 +679,11 @@ fi
 
 
 %changelog
+* Fri May 13 2011 <matt@redhat> - 7.7.0-0.1
+- Fast forward to 7.7.0 pre-release at 79952d6b
+- Introduced ec2_gahp
+- 79952d6b brings schema expectations inline with Cumin
+
 * Tue May 10 2011 <matt@redhat> - 7.6.1-0.1
 - Upgrade to 7.6.0 release, pre-release of 7.6.1 at 5617a464
 - Upstreamed patch: log_lock_run.patch
