@@ -34,7 +34,7 @@ Source0: condor-7.6.0-327697-RH.tar.gz
 Source1: generate-tarball.sh
 Patch0: condor_config.generic.patch
 Patch3: chkconfig_off.patch
-Patch4: 7.7.0-catch_up.patch
+Patch4: 7.7.0-catch-up.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
