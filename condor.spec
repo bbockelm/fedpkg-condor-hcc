@@ -3,7 +3,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.0
-Release: 0.1%{?dist}
+Release: 0.2%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -57,6 +57,32 @@ BuildRequires: /usr/include/curl/curl.h
 BuildRequires: /usr/include/expat.h
 BuildRequires: qpid-qmf-devel
 BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
+
+# Globus GSI build requirements
+BuildRequires: globus-gssapi-gsi-devel
+BuildRequires: globus-gass-server-ez-devel
+BuildRequires: globus-gass-transfer-devel
+BuildRequires: globus-gram-client-devel
+BuildRequires: globus-rsl-devel
+BuildRequires: globus-gram-protocol
+BuildRequires: globus-io-devel
+BuildRequires: globus-xio-devel
+BuildRequires: globus-gssapi-error-devel
+BuildRequires: globus-gss-assist-devel
+BuildRequires: globus-gsi-proxy-core-devel
+BuildRequires: globus-gsi-credential-devel
+BuildRequires: globus-gsi-callback-devel
+BuildRequires: globus-gsi-sysconfig-devel
+BuildRequires: globus-gsi-cert-utils-devel
+BuildRequires: globus-openssl-module-devel
+BuildRequires: globus-gsi-openssl-error-devel
+BuildRequires: globus-gsi-proxy-ssl-devel
+BuildRequires: globus-callout-devel
+BuildRequires: globus-common-devel
+BuildRequires: globus-ftp-client-devel
+BuildRequires: globus-ftp-control-devel
+BuildRequires: libtool-ltdl-devel
+BuildRequires: voms-devel
 
 #Requires: gsoap >= 2.7.12
 Requires: mailx
@@ -232,7 +258,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWANT_FULL_DEPLOYMENT:BOOL=FALSE \
        -DWANT_GLEXEC:BOOL=FALSE \
        -DWITH_LIBDELTACLOUD:BOOL=TRUE \
-       -DWITH_GLOBUS:BOOL=FALSE
+       -DWITH_GLOBUS:BOOL=TRUE
 make %{?_smp_mflags}
 
 
@@ -326,9 +352,6 @@ echo "TRUST_UID_DOMAIN = TRUE" >> %{buildroot}/%{_sharedstatedir}/condor/condor_
 rm %{buildroot}/%{_sbindir}/condor_set_shutdown
 rm %{buildroot}/%{_mandir}/man1/condor_set_shutdown.1.gz
 
-# not packaging glidein support, depends on globus
-rm %{buildroot}/%{_mandir}/man1/condor_glidein.1.gz
-
 # not packaging deployment tools
 rm %{buildroot}/%{_mandir}/man1/condor_config_bind.1.gz
 rm %{buildroot}/%{_mandir}/man1/condor_cold_start.1.gz
@@ -392,6 +415,8 @@ rm -rf %{buildroot}
 %_datadir/condor/CondorJavaWrapper.class
 %_datadir/condor/Condor.pm
 %_datadir/condor/scimark2lib.jar
+%_datadir/condor/gt4-gahp.jar
+%_datadir/condor/gt42-gahp.jar
 %dir %_sysconfdir/condor/config.d/
 %_sysconfdir/condor/config.d/00personal_condor.config
 %_sysconfdir/condor/condor_ssh_to_job_sshd_config_template
@@ -415,6 +440,8 @@ rm -rf %{buildroot}
 %_libexecdir/condor/data_plugin
 %_libexecdir/condor/curl_plugin
 %_libexecdir/condor/condor_shared_port
+%_libexecdir/condor/condor_glexec_wrapper
+%_libexecdir/condor/glexec_starter_setup.sh
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
 %_mandir/man1/condor_chirp.1.gz
@@ -456,6 +483,7 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_router_q.1.gz
 %_mandir/man1/condor_ssh_to_job.1.gz
 %_mandir/man1/condor_power.1.gz
+%_mandir/man1/condor_glidein.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
 %_bindir/condor
 %_bindir/condor_submit_dag
@@ -492,6 +520,7 @@ rm -rf %{buildroot}
 %_bindir/condor_power
 %_bindir/condor_gather_info
 %_bindir/condor_test_match
+%_bindir/condor_glidein
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
 %_sbindir/condor_advertise
@@ -520,6 +549,12 @@ rm -rf %{buildroot}
 %_sbindir/condor_updates_stats
 %_sbindir/ec2_gahp
 %_sbindir/condor_gridmanager
+%_sbindir/condor_gridshell
+%_sbindir/gahp_server
+%_sbindir/grid_monitor.sh
+%_sbindir/nordugrid_gahp
+%_sbindir/gt4_gahp
+%_sbindir/gt42_gahp
 #%_sbindir/condor_credd
 %config(noreplace) %_var/lib/condor/condor_config.local
 %defattr(-,condor,condor,-)
@@ -679,6 +714,9 @@ fi
 
 
 %changelog
+* Fri May 20 2011 <matt@redhat> - 7.7.0-0.2
+- Added GSI support, dependency on Globus
+
 * Fri May 13 2011 <matt@redhat> - 7.7.0-0.1
 - Fast forward to 7.7.0 pre-release at 79952d6b
 - Introduced ec2_gahp
