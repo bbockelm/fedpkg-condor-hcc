@@ -692,11 +692,11 @@ rm -rf %{buildroot}
 %post -n condor
 /sbin/chkconfig --add condor
 /sbin/ldconfig
-test -x /usr/sbin/selinuxenabled && /usr/sbin/selinuxenabled
-if [ $? = 0 ]; then
-   semanage fcontext -a -t unconfined_execmem_exec_t %_sbindir/condor_startd
-   restorecon  %_sbindir/condor_startd
-fi
+#test -x /usr/sbin/selinuxenabled && /usr/sbin/selinuxenabled
+#if [ $? = 0 ]; then
+#   semanage fcontext -a -t unconfined_execmem_exec_t %_sbindir/condor_startd
+#   restorecon  %_sbindir/condor_startd
+#fi
 
 
 %preun -n condor
