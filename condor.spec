@@ -434,7 +434,7 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_rooster
 %_libexecdir/condor/condor_ssh_to_job_shell_setup
 %_libexecdir/condor/condor_ssh_to_job_sshd_setup
-%_libexecdir/condor/power_state
+%_libexecdir/condor/condor_power_state
 %_libexecdir/condor/condor_kflops
 %_libexecdir/condor/condor_mips
 %_libexecdir/condor/data_plugin
@@ -552,7 +552,7 @@ rm -rf %{buildroot}
 %_sbindir/condor_gridshell
 %_sbindir/gahp_server
 %_sbindir/grid_monitor.sh
-%_sbindir/nordugrid_gahp
+#%_sbindir/nordugrid_gahp -- needs ldap.h
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
 #%_sbindir/condor_credd
