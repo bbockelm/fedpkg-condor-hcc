@@ -32,6 +32,7 @@ URL: http://www.cs.wisc.edu/condor/
 # Note: The md5sum of each generated tarball may be different
 Source0: condor-7.6.0-327697-RH.tar.gz
 Source1: generate-tarball.sh
+Source2: %{name}-tmpfiles.conf
 Patch0: condor_config.generic.patch
 Patch3: chkconfig_off.patch
 Patch4: 7.7.0-catch-up.patch
@@ -88,6 +89,8 @@ BuildRequires: voms-devel
 Requires: mailx
 Requires: python >= 2.2
 Requires: condor-classads = %{version}-%{release}
+
+Requires: initscripts
 
 Requires(pre): shadow-utils
 
@@ -389,6 +392,10 @@ rm -r %{buildroot}/%{_sysconfdir}/init.d
 # install the lsb init script
 install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
 
+# install tmpfiles.d/condor.conf
+mkdir -p %{buildroot}%{_sysconfdir}/tmpfiles.d
+install -m 0644 %{SOURCE1} %{buildroot}%{_sysconfdir}/tmpfiles.d/%{name}.conf
+
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
 
@@ -409,6 +416,7 @@ rm -rf %{buildroot}
 %_initrddir/condor
 %dir %_sysconfdir/condor/
 %config(noreplace) %_sysconfdir/condor/condor_config
+%config(noreplace) %_sysconfdir/tmpfiles.d/%{name}.conf
 %dir %_datadir/condor/
 %_datadir/condor/Chirp.jar
 %_datadir/condor/CondorJavaInfo.class
@@ -717,6 +725,7 @@ fi
 * Tue Jun  7 2011 <matt@redhat> - 7.7.0-0.3
 - Fast forward to 7.7.0 pre-release at 1babb324
 -  Catch libdeltacloud 0.8 update
+- Added tmpfiles.d/condor.conf (BZ711456)
 
 * Fri May 20 2011 <matt@redhat> - 7.7.0-0.2
 - Added GSI support, dependency on Globus
