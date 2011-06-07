@@ -3,7 +3,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.0
-Release: 0.2%{?dist}
+Release: 0.3%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -714,6 +714,10 @@ fi
 
 
 %changelog
+* Tue Jun  7 2011 <matt@redhat> - 7.7.0-0.3
+- Fast forward to 7.7.0 pre-release at 1babb324
+-  Catch libdeltacloud 0.8 update
+
 * Fri May 20 2011 <matt@redhat> - 7.7.0-0.2
 - Added GSI support, dependency on Globus
 
