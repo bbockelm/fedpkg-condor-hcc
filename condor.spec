@@ -3,7 +3,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.0
-Release: 0.3%{?dist}
+Release: 0.4%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -336,21 +336,6 @@ mkdir -p -m1777 %{buildroot}/%{_var}/lock/condor/local
 mkdir -p -m0755 %{buildroot}/%{_sharedstatedir}/condor/spool
 mkdir -p -m1777 %{buildroot}/%{_sharedstatedir}/condor/execute
 
-cat >> %{buildroot}/%{_sharedstatedir}/condor/condor_config.local << EOF
-CONDOR_DEVELOPERS = NONE
-CONDOR_HOST = \$(FULL_HOSTNAME)
-COLLECTOR_NAME = Personal Condor
-START = TRUE
-SUSPEND = FALSE
-PREEMPT = FALSE
-KILL = FALSE
-DAEMON_LIST = COLLECTOR, MASTER, NEGOTIATOR, SCHEDD, STARTD
-NEGOTIATOR_INTERVAL = 20
-EOF
-
-# this gets around a bug whose fix is not yet merged
-echo "TRUST_UID_DOMAIN = TRUE" >> %{buildroot}/%{_sharedstatedir}/condor/condor_config.local
-
 # no master shutdown program for now
 rm %{buildroot}/%{_sbindir}/condor_set_shutdown
 rm %{buildroot}/%{_mandir}/man1/condor_set_shutdown.1.gz
@@ -394,7 +379,7 @@ install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/
 
 # install tmpfiles.d/condor.conf
 mkdir -p %{buildroot}%{_sysconfdir}/tmpfiles.d
-install -m 0644 %{SOURCE1} %{buildroot}%{_sysconfdir}/tmpfiles.d/%{name}.conf
+install -m 0644 %{SOURCE2} %{buildroot}%{_sysconfdir}/tmpfiles.d/%{name}.conf
 
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
@@ -564,7 +549,6 @@ rm -rf %{buildroot}
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
 #%_sbindir/condor_credd
-%config(noreplace) %_var/lib/condor/condor_config.local
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
@@ -722,6 +706,10 @@ fi
 
 
 %changelog
+* Wed Jun  8 2011 <matt@redhat> - 7.7.0-0.4
+- Install SOURCE2 instead of SOURCE1 into tmpfiles.d
+- Removed unused condor_config.local
+
 * Tue Jun  7 2011 <matt@redhat> - 7.7.0-0.3
 - Fast forward to 7.7.0 pre-release at 1babb324
 -  Catch libdeltacloud 0.8 update
