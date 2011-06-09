@@ -1,9 +1,30 @@
 %define tarball_version 7.6.0
 
+# Things for F15 or later
+# TODO: How do we express "f15 or later?"
+%if 0%{?fedora} >= 15
+# NOTE: Condor+gsoap doesn't work yet on F15; ticket not yet upstream AFAIK.  BB
+%define gsoap 0
+%define deltacloud 1
+%define aviary 1
+%define systemd 1
+%define cgroups 1
+%else
+%define gsoap 1
+%define deltacloud 0
+%define aviary 0
+%define systemd 0
+%define cgroups 0
+%endif
+
+# Things not turned on, or don't have Fedora packages yet
+%define blahp 0
+%define qmf 0
+
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.0
-Release: 0.4%{?dist}
+Release: 0.5%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -32,7 +53,10 @@ URL: http://www.cs.wisc.edu/condor/
 # Note: The md5sum of each generated tarball may be different
 Source0: condor-7.6.0-327697-RH.tar.gz
 Source1: generate-tarball.sh
+%if %systemd
 Source2: %{name}-tmpfiles.conf
+Source3: condor.service
+%endif
 Patch0: condor_config.generic.patch
 Patch3: chkconfig_off.patch
 Patch4: 7.7.0-catch-up.patch
@@ -46,18 +70,27 @@ BuildRequires: pcre-devel
 #BuildRequires: postgresql-devel
 BuildRequires: openssl-devel
 BuildRequires: krb5-devel
-#BuildRequires: gsoap-devel >= 2.7.12-1
+%if %gsoap
+BuildRequires: gsoap-devel >= 2.7.12-1
+%endif
 BuildRequires: libvirt-devel
 BuildRequires: bind-utils
 BuildRequires: m4
 #BuildRequires: autoconf
 BuildRequires: libX11-devel
+%if %aviary
 BuildRequires: wso2-wsf-cpp-devel
 BuildRequires: wso2-axis2-devel
+%endif
 BuildRequires: /usr/include/curl/curl.h
 BuildRequires: /usr/include/expat.h
+%if %qmf
 BuildRequires: qpid-qmf-devel
+%endif
+%if %deltacloud
 BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
+%endif
+BuildRequires: openldap-devel
 
 # Globus GSI build requirements
 BuildRequires: globus-gssapi-gsi-devel
@@ -85,19 +118,49 @@ BuildRequires: globus-ftp-control-devel
 BuildRequires: libtool-ltdl-devel
 BuildRequires: voms-devel
 
-#Requires: gsoap >= 2.7.12
+%if %cgroups
+BuildRequires: libcgroup-devel >= 0.37
+%endif
+
+%if %blahp
+BuildRequires: blahp
+%endif
+
+%if %qmf
+BuildRequires: qpid-qmf-devel
+%endif
+
+%if %systemd
+BuildRequires: systemd-units
+%endif
+
+%if %gsoap
+Requires: gsoap >= 2.7.12
+%endif
 Requires: mailx
 Requires: python >= 2.2
 Requires: condor-classads = %{version}-%{release}
+%if %blahp
+Requires: blahp >= 1.16.1
+%endif
+# libcgroup < 0.37 has a bug that invalidates our accounting.
+Requires: libcgroup >= 0.37
 
 Requires: initscripts
 
 Requires(pre): shadow-utils
 
+%if %systemd
+Requires(post): systemd-units
+Requires(preun): systemd-units
+Requires(postun): systemd-units
+Requires(post): systemd-sysv
+%else
 Requires(post):/sbin/chkconfig
 Requires(preun):/sbin/chkconfig
 Requires(preun):/sbin/service
 Requires(postun):/sbin/service
+%endif
 
 #Provides: user(condor) = 43
 #Provides: group(condor) = 43
@@ -116,16 +179,7 @@ monitors their progress, and ultimately informs the user upon
 completion.
 
 
-#%package static
-#Summary: Headers and libraries for interacting with Condor
-#Group: Development/System
-#Requires: %name = %version-%release
-#
-#
-#%description static
-#Headers and libraries for interacting with Condor and its components.
-
-
+%if %qmf
 %package qmf
 Summary: Condor QMF components
 Group: Applications/System
@@ -137,8 +191,9 @@ Obsoletes: condor-qmf-plugins
 
 %description qmf
 Components to connect Condor to the QMF management bus.
+%endif
 
-
+%if %aviary
 %package aviary
 Summary: Condor Aviary components
 Group: Applications/System
@@ -147,7 +202,7 @@ Requires: condor-classads = %{version}-%{release}
 
 %description aviary
 Components to provide simplified WS interface to Condor.
-
+%endif
 
 %package kbdd
 Summary: Condor Keyboard Daemon
@@ -173,7 +228,7 @@ The condor_vm-gahp enables the Virtual Machine Universe feature of
 Condor. The VM Universe uses libvirt to start and control VMs under
 Condor's Startd.
 
-
+%if %deltacloud
 %package deltacloud-gahp
 Summary: Condor's Deltacloud Gahp
 Group: Applications/System
@@ -182,7 +237,7 @@ Requires: %name = %version-%release
 %description deltacloud-gahp
 The deltacloud_gahp enables Condor's ability to manage jobs run on
 resources exposed by the deltacloud API.
-
+%endif
 
 %package classads
 Summary: Condor's classified advertisement language
@@ -246,7 +301,11 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %cmake -DNO_PHONE_HOME:BOOL=TRUE \
        -DHAVE_BACKFILL:BOOL=FALSE \
        -DHAVE_BOINC:BOOL=FALSE \
+%if %gsoap
+       -DWITH_GSOAP:BOOL=TRUE \
+%else
        -DWITH_GSOAP:BOOL=FALSE \
+%endif
        -DWITH_POSTGRESQL:BOOL=FALSE \
        -DHAVE_KBDD:BOOL=TRUE \
        -DHAVE_HIBERNATION:BOOL=TRUE \
@@ -255,13 +314,33 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWANT_QUILL:BOOL=FALSE \
        -DWITH_ZLIB:BOOL=FALSE \
        -DWANT_CONTRIB:BOOL=ON \
-       -DWITH_MANAGEMENT:BOOL=TRUE \
+%if %aviary
        -DWITH_AVIARY:BOOL=TRUE \
+%else
+       -DWITH_AVIARY:BOOL=FALSE \
+%endif
+%if %qmf
        -DWITH_TRIGGERD:BOOL=TRUE \
+       -DWITH_MANAGEMENT:BOOL=TRUE \
+%else
+       -DWITH_TRIGGERD:BOOL=FALSE \
+       -DWITH_MANAGEMENT:BOOL=FALSE \
+%endif
        -DWANT_FULL_DEPLOYMENT:BOOL=FALSE \
        -DWANT_GLEXEC:BOOL=FALSE \
+%if %deltacloud
        -DWITH_LIBDELTACLOUD:BOOL=TRUE \
-       -DWITH_GLOBUS:BOOL=TRUE
+%else
+       -DWITH_LIBDELTACLOUD:BOOL=FALSE \
+%endif
+       -DWITH_GLOBUS:BOOL=TRUE \
+       -DLIBCGROUP_FOUND_SEARCH_cgroup=/%{_lib}/libcgroup.so.1
+
+# NOTE: I used to have these.  Check to see if they are still needed
+#       -DHAVE_BACKFILL:BOOL=TRUE \
+#       -DBUILD_TESTS=OFF \
+#       -DCONDOR_STRIP_PACKAGES=OFF \
+
 make %{?_smp_mflags}
 
 
@@ -318,16 +397,20 @@ sed -e "s:^LIB\s*=.*:LIB = \$(RELEASE_DIR)/$LIB/condor:" \
 # Install the basic configuration, a Personal Condor config. Allows for
 # yum install condor + service condor start and go.
 mkdir -m0755 %{buildroot}/%{_sysconfdir}/condor/config.d
-cp %{buildroot}/etc/examples/condor_config.local %{buildroot}/%{_sysconfdir}/condor/config.d/00personal_condor.config
+cp %{buildroot}/etc/examples/condor_config.local %{buildroot}/%{_sysconfdir}/condor/config.d/00-personal_condor.config
 
+%if %qmf
 # Install condor-qmf's base plugin configuration
 populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/60condor-qmf.config
+%endif
+%if %aviary
 # Install condor-aviary's base plugin configuration
 populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/61aviary.config
 
 mkdir -p %{buildroot}/%{_var}/lib/condor/aviary
 populate %{_var}/lib/condor/aviary %{buildroot}/usr/axis2.xml
 populate %{_var}/lib/condor/aviary %{buildroot}/usr/services/
+%endif
 
 mkdir -p -m0755 %{buildroot}/%{_var}/run/condor
 mkdir -p -m0755 %{buildroot}/%{_var}/log/condor
@@ -389,12 +472,17 @@ rm %{buildroot}/%{_mandir}/man1/condor_load_history.1.gz
 rm -r %{buildroot}/%{_sysconfdir}/sysconfig
 rm -r %{buildroot}/%{_sysconfdir}/init.d
 
-# install the lsb init script
-install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
-
+%if %systemd
 # install tmpfiles.d/condor.conf
 mkdir -p %{buildroot}%{_sysconfdir}/tmpfiles.d
-install -m 0644 %{SOURCE1} %{buildroot}%{_sysconfdir}/tmpfiles.d/%{name}.conf
+install -m 0644 %{SOURCE2} %{buildroot}%{_sysconfdir}/tmpfiles.d/%{name}.conf
+
+mkdir -p %{buildroot}%{_unitdir}
+cp %{SOURCE3} %{buildroot}%{_unitdir}/condor.service
+%else
+# install the lsb init script
+install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
+%endif
 
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
@@ -413,10 +501,14 @@ rm -rf %{buildroot}
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt examples
-%_initrddir/condor
 %dir %_sysconfdir/condor/
 %config(noreplace) %_sysconfdir/condor/condor_config
+%if %systemd
 %config(noreplace) %_sysconfdir/tmpfiles.d/%{name}.conf
+%{_unitdir}/condor.service
+%else
+%_initrddir/condor
+%endif
 %dir %_datadir/condor/
 %_datadir/condor/Chirp.jar
 %_datadir/condor/CondorJavaInfo.class
@@ -426,11 +518,13 @@ rm -rf %{buildroot}
 %_datadir/condor/gt4-gahp.jar
 %_datadir/condor/gt42-gahp.jar
 %dir %_sysconfdir/condor/config.d/
-%_sysconfdir/condor/config.d/00personal_condor.config
+%_sysconfdir/condor/config.d/00-personal_condor.config
 %_sysconfdir/condor/condor_ssh_to_job_sshd_config_template
-#%dir %_datadir/condor/webservice/
-#%_datadir/condor/webservice/condorCollector.wsdl
-#%_datadir/condor/webservice/condorSchedd.wsdl
+%if %gsoap
+%dir %_datadir/condor/webservice/
+%_datadir/condor/webservice/condorCollector.wsdl
+%_datadir/condor/webservice/condorSchedd.wsdl
+%endif
 %dir %_libexecdir/condor/
 %_libexecdir/condor/condor_chirp
 %_libexecdir/condor/condor_ssh
@@ -560,7 +654,7 @@ rm -rf %{buildroot}
 %_sbindir/condor_gridshell
 %_sbindir/gahp_server
 %_sbindir/grid_monitor.sh
-#%_sbindir/nordugrid_gahp -- needs ldap.h
+%_sbindir/nordugrid_gahp
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
 #%_sbindir/condor_credd
@@ -590,7 +684,7 @@ rm -rf %{buildroot}
 #%_usrsrc/chirp/chirp_client.h
 #%_usrsrc/chirp/chirp_protocol.h
 
-
+%if %qmf
 %files qmf
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
@@ -605,8 +699,9 @@ rm -rf %{buildroot}
 %_sbindir/condor_trigger_config
 %_sbindir/condor_triggerd
 %_sbindir/condor_job_server
+%endif
 
-
+%if %aviary
 %files aviary
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
@@ -629,7 +724,7 @@ rm -rf %{buildroot}
 %_var/lib/condor/aviary/services/query/aviary-common.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.wsdl
-
+%endif
 
 %files kbdd
 %defattr(-,root,root,-)
@@ -645,12 +740,12 @@ rm -rf %{buildroot}
 #%_sbindir/condor_vm_xen.sh
 %_libexecdir/condor/libvirt_simple_script.awk
 
-
+%if %deltacloud
 %files deltacloud-gahp
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
 %_sbindir/deltacloud_gahp
-
+%endif
 
 %files classads
 %defattr(-,root,root,-)
@@ -696,7 +791,35 @@ rm -rf %{buildroot}
 %_includedir/classad/xmlSink.h
 %_includedir/classad/xmlSource.h
 
+%if %systemd
+%post
+if [ $1 -eq 1 ] ; then
+    # Initial installation 
+    /bin/systemctl daemon-reload >/dev/null 2>&1 || :
+fi
 
+%preun
+if [ $1 -eq 0 ] ; then
+    # Package removal, not upgrade
+    /bin/systemctl --no-reload disable condor.service > /dev/null 2>&1 || :
+    /bin/systemctl stop condor.service > /dev/null 2>&1 || :
+fi
+
+%postun
+/bin/systemctl daemon-reload >/dev/null 2>&1 || :
+if [ $1 -ge 1 ] ; then
+    # Package upgrade, not uninstall
+    /bin/systemctl try-restart condor.service >/dev/null 2>&1 || :
+fi
+
+%triggerun -- condor < 7.7.0-0.4
+
+/usr/bin/systemd-sysv-convert --save condor >/dev/null 2>&1 ||:
+
+/sbin/chkconfig --del condor >/dev/null 2>&1 || :
+/bin/systemctl try-restart condor.service >/dev/null 2>&1 || :
+
+%else
 %post -n condor
 /sbin/chkconfig --add condor
 /sbin/ldconfig
@@ -719,15 +842,19 @@ if [ "$1" -ge "1" ]; then
   /sbin/service condor condrestart >/dev/null 2>&1 || :
 fi
 /sbin/ldconfig
-
+%endif
 
 %changelog
+* Tue Jun  8 2011 <bbockelm@cse.unl.edu> - 7.7.0-0.5
+- Start to break build products into conditionals for future EPEL5 support.
+- Begun integration of a systemd service file.
+
 * Tue Jun  7 2011 <matt@redhat> - 7.7.0-0.4
 - Added tmpfiles.d/condor.conf (BZ711456)
 
 * Tue Jun  7 2011 <matt@redhat> - 7.7.0-0.3
 - Fast forward to 7.7.0 pre-release at 1babb324
--  Catch libdeltacloud 0.8 update
+- Catch libdeltacloud 0.8 update
 
 * Fri May 20 2011 <matt@redhat> - 7.7.0-0.2
 - Added GSI support, dependency on Globus
