@@ -1,7 +1,6 @@
 %define tarball_version 7.6.0
 
 # Things for F15 or later
-# TODO: How do we express "f15 or later?"
 %if 0%{?fedora} >= 15
 # NOTE: Condor+gsoap doesn't work yet on F15; ticket not yet upstream AFAIK.  BB
 %define gsoap 0
@@ -397,7 +396,7 @@ sed -e "s:^LIB\s*=.*:LIB = \$(RELEASE_DIR)/$LIB/condor:" \
 # Install the basic configuration, a Personal Condor config. Allows for
 # yum install condor + service condor start and go.
 mkdir -m0755 %{buildroot}/%{_sysconfdir}/condor/config.d
-cp %{buildroot}/etc/examples/condor_config.local %{buildroot}/%{_sysconfdir}/condor/config.d/00-personal_condor.config
+cp %{buildroot}/etc/examples/condor_config.local %{buildroot}/%{_sysconfdir}/condor/config.d/00personal_condor.config
 
 %if %qmf
 # Install condor-qmf's base plugin configuration
