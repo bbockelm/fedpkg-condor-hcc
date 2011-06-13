@@ -115,6 +115,7 @@ Patch3: chkconfig_off.patch
 %if !%git_build
 Patch4: 7.7.0-catch-up.patch
 %endif
+Patch5: condor_shared_libs.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -364,6 +365,7 @@ exit 0
 %patch4 -p1
 %endif
 %patch0 -p1
+%patch5 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -443,9 +445,10 @@ populate %_sysconfdir/condor %{buildroot}/%{_usr}/lib/condor_ssh_to_job_sshd_con
 
 # Things in /usr/lib really belong in /usr/share/condor
 populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
-# Except for libclassad
+# Except for the shared libs
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
 rm -f %{buildroot}/%{_datadir}/condor/libclassads.a
+mv %{buildroot}%{_datadir}/condor/lib*.so %{buildroot}%{_libdir}/
 
 populate %{_libdir}/condor/plugins %{buildroot}/%{_usr}/libexec/*-plugin.so
 
@@ -752,6 +755,7 @@ rm -rf %{buildroot}
 %_sbindir/nordugrid_gahp
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
+%_libdir/lib*.so
 #%_sbindir/condor_credd
 %config(noreplace) %_var/lib/condor/condor_config.local
 %defattr(-,condor,condor,-)
@@ -847,6 +851,7 @@ rm -rf %{buildroot}
 %doc LICENSE-2.0.txt NOTICE.txt
 %_libdir/libclassad.so.1
 %_libdir/libclassad.so.1.1.0
+%_libdir/libclassads.so
 
 %files classads-devel
 %defattr(-,root,root,-)
