@@ -20,6 +20,18 @@
 %define blahp 0
 %define qmf 0
 
+# These flags are meant for developers; it allows one to build Condor
+# based upon a git-derived tarball, instead of an upstream release tarball
+%define git_build 0
+%define git_build_man 0
+
+# Determine whether man pages will be included.
+%if !%git_build || (%git_build && %git_build_man)
+%define include_man 1
+%else
+%define include_man 0
+%endif
+
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.0
@@ -27,6 +39,23 @@ Release: 0.5%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
+
+# This allows developers to test the RPM with a non-release, git tarball
+%if %git_build
+# git clone http://condor-git.cs.wisc.edu/repos/condor.git
+# cd condor
+# git-archive master | gzip -7 > ~/rpmbuild/SOURCES/condor.tar.gz
+Source0: condor.tar.gz
+
+# Also potentially allow a git-based doc tarball
+%if %git_build_man
+# git clone http://condor-git.cs.wisc.edu/repos/condor_docs.git
+# cd condor
+# git-archive V7_6_0 | gzip -7 > ~/rpmbuild/SOURCES/condor_docs.tar.gz
+Source1: condor_docs.tar.gz
+%endif
+
+%else
 # The upstream Condor source tarball contains some source that cannot
 # be shipped as well as extraneous copies of packages the source
 # depends on. Additionally, the upstream Condor source requires a
@@ -52,13 +81,17 @@ URL: http://www.cs.wisc.edu/condor/
 # Note: The md5sum of each generated tarball may be different
 Source0: condor-7.6.0-327697-RH.tar.gz
 Source1: generate-tarball.sh
+%endif
+
 %if %systemd
 Source2: %{name}-tmpfiles.conf
 Source3: condor.service
 %endif
 Patch0: condor_config.generic.patch
 Patch3: chkconfig_off.patch
+%if !%git_build
 Patch4: 7.7.0-catch-up.patch
+%endif
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -131,6 +164,11 @@ BuildRequires: qpid-qmf-devel
 
 %if %systemd
 BuildRequires: systemd-units
+%endif
+
+%if %git_build_man
+BuildRequires: transfig
+BuildRequires: latex2html
 %endif
 
 %if %gsoap
@@ -286,10 +324,22 @@ exit 0
 
 
 %prep
+%if %git_build
+%if %git_build_man
+%setup -q -c -n %{name}-%{tarball_version} -a 1
+%else
+%setup -q -c -n %{name}-%{tarball_version}
+%endif
+%else
+# For release tarballs
 %setup -q -n %{name}-%{tarball_version}
+%endif
 
 %patch3 -p1
+# Catch-up patch for release tarballs
+%if !%git_build
 %patch4 -p1
+%endif
 %patch0 -p1
 
 # fix errant execute permissions
@@ -297,6 +347,14 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 
 
 %build
+
+# Possibly build man files
+%if %git_build_man
+pushd doc
+make just-man-pages
+popd
+%endif
+
 %cmake -DNO_PHONE_HOME:BOOL=TRUE \
        -DHAVE_BACKFILL:BOOL=FALSE \
        -DHAVE_BOINC:BOOL=FALSE \
@@ -372,8 +430,17 @@ populate %{_libdir}/condor/plugins %{buildroot}/%{_usr}/libexec/*-plugin.so
 populate %_libexecdir/condor %{buildroot}/usr/libexec/*
 
 # man pages go under %{_mandir}
+%if %include_man
 mkdir -p %{buildroot}/%{_mandir}
 mv %{buildroot}/usr/man/man1 %{buildroot}/%{_mandir}
+%if %git_build_man
+pushd %{buildroot}/%{_mandir}/man1
+for i in `ls`; do
+  gzip $i
+done
+popd
+%endif
+%endif
 
 # Things in /usr/lib really belong in /usr/share/condor
 #mv %{buildroot}/usr/lib %{buildroot}/%{_datarootdir}/condor
@@ -435,9 +502,12 @@ echo "TRUST_UID_DOMAIN = TRUE" >> %{buildroot}/%{_sharedstatedir}/condor/condor_
 
 # no master shutdown program for now
 rm %{buildroot}/%{_sbindir}/condor_set_shutdown
+%if %include_man
 rm %{buildroot}/%{_mandir}/man1/condor_set_shutdown.1.gz
+%endif
 
 # not packaging deployment tools
+%if %include_man
 rm %{buildroot}/%{_mandir}/man1/condor_config_bind.1.gz
 rm %{buildroot}/%{_mandir}/man1/condor_cold_start.1.gz
 rm %{buildroot}/%{_mandir}/man1/condor_cold_stop.1.gz
@@ -466,6 +536,7 @@ rm %{buildroot}/%{_mandir}/man1/procd_ctl.1.gz
 
 # not packaging quill bits
 rm %{buildroot}/%{_mandir}/man1/condor_load_history.1.gz
+%endif
 
 # Remove junk
 rm -r %{buildroot}/%{_sysconfdir}/sysconfig
@@ -517,7 +588,7 @@ rm -rf %{buildroot}
 %_datadir/condor/gt4-gahp.jar
 %_datadir/condor/gt42-gahp.jar
 %dir %_sysconfdir/condor/config.d/
-%_sysconfdir/condor/config.d/00-personal_condor.config
+%_sysconfdir/condor/config.d/00personal_condor.config
 %_sysconfdir/condor/condor_ssh_to_job_sshd_config_template
 %if %gsoap
 %dir %_datadir/condor/webservice/
@@ -543,6 +614,7 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_shared_port
 %_libexecdir/condor/condor_glexec_wrapper
 %_libexecdir/condor/glexec_starter_setup.sh
+%if %include_man
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
 %_mandir/man1/condor_chirp.1.gz
@@ -585,6 +657,7 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_ssh_to_job.1.gz
 %_mandir/man1/condor_power.1.gz
 %_mandir/man1/condor_glidein.1.gz
+%endif
 # bin/condor is a link for checkpoint, reschedule, vacate
 %_bindir/condor
 %_bindir/condor_submit_dag
@@ -811,7 +884,7 @@ if [ $1 -ge 1 ] ; then
     /bin/systemctl try-restart condor.service >/dev/null 2>&1 || :
 fi
 
-%triggerun -- condor < 7.7.0-0.4
+%triggerun -- condor < 7.7.0-0.5
 
 /usr/bin/systemd-sysv-convert --save condor >/dev/null 2>&1 ||:
 
