@@ -3,7 +3,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.0
-Release: 0.4%{?dist}
+Release: 0.5%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -56,7 +56,7 @@ BuildRequires: wso2-wsf-cpp-devel
 BuildRequires: wso2-axis2-devel
 BuildRequires: /usr/include/curl/curl.h
 BuildRequires: /usr/include/expat.h
-#BuildRequires: qpid-qmf-devel
+BuildRequires: qpid-qmf-devel
 BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
 
 # Globus GSI build requirements
@@ -126,17 +126,17 @@ completion.
 #Headers and libraries for interacting with Condor and its components.
 
 
-#%package qmf
-#Summary: Condor QMF components
-#Group: Applications/System
-#Requires: %name = %version-%release
-##Requires: qmf >= %{qmf_version}
-#Requires: python-qmf >= 0.7.946106
-#Requires: condor-classads = %{version}-%{release}
-#Obsoletes: condor-qmf-plugins
-#
-#%description qmf
-#Components to connect Condor to the QMF management bus.
+%package qmf
+Summary: Condor QMF components
+Group: Applications/System
+Requires: %name = %version-%release
+#Requires: qmf >= %{qmf_version}
+Requires: python-qmf >= 0.7.946106
+Requires: condor-classads = %{version}-%{release}
+Obsoletes: condor-qmf-plugins
+
+%description qmf
+Components to connect Condor to the QMF management bus.
 
 
 %package aviary
@@ -320,8 +320,8 @@ sed -e "s:^LIB\s*=.*:LIB = \$(RELEASE_DIR)/$LIB/condor:" \
 mkdir -m0755 %{buildroot}/%{_sysconfdir}/condor/config.d
 cp %{buildroot}/etc/examples/condor_config.local %{buildroot}/%{_sysconfdir}/condor/config.d/00personal_condor.config
 
-## Install condor-qmf's base plugin configuration
-#populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/60condor-qmf.config
+# Install condor-qmf's base plugin configuration
+populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/60condor-qmf.config
 # Install condor-aviary's base plugin configuration
 populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/61aviary.config
 
@@ -575,20 +575,20 @@ rm -rf %{buildroot}
 #%_usrsrc/chirp/chirp_protocol.h
 
 
-#%files qmf
-#%defattr(-,root,root,-)
-#%doc LICENSE-2.0.txt NOTICE.txt
-#%_sysconfdir/condor/config.d/60condor-qmf.config
-#%dir %_libdir/condor/plugins
-#%_libdir/condor/plugins/MgmtCollectorPlugin-plugin.so
-#%_libdir/condor/plugins/MgmtMasterPlugin-plugin.so
-#%_libdir/condor/plugins/MgmtNegotiatorPlugin-plugin.so
-#%_libdir/condor/plugins/MgmtScheddPlugin-plugin.so
-#%_libdir/condor/plugins/MgmtStartdPlugin-plugin.so
-#%_bindir/get_trigger_data
-#%_sbindir/condor_trigger_config
-#%_sbindir/condor_triggerd
-#%_sbindir/condor_job_server
+%files qmf
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sysconfdir/condor/config.d/60condor-qmf.config
+%dir %_libdir/condor/plugins
+%_libdir/condor/plugins/MgmtCollectorPlugin-plugin.so
+%_libdir/condor/plugins/MgmtMasterPlugin-plugin.so
+%_libdir/condor/plugins/MgmtNegotiatorPlugin-plugin.so
+%_libdir/condor/plugins/MgmtScheddPlugin-plugin.so
+%_libdir/condor/plugins/MgmtStartdPlugin-plugin.so
+%_bindir/get_trigger_data
+%_sbindir/condor_trigger_config
+%_sbindir/condor_triggerd
+%_sbindir/condor_job_server
 
 
 %files aviary
@@ -706,6 +706,9 @@ fi
 
 
 %changelog
+* Tue Jun 14 2011 <matt@redhat> - 7.7.0-0.5
+- Enabled condor-qmf package
+
 * Wed Jun  8 2011 <matt@redhat> - 7.7.0-0.4
 - Install SOURCE2 instead of SOURCE1 into tmpfiles.d
 - Removed unused condor_config.local
