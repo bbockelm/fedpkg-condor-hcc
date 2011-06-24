@@ -108,7 +108,8 @@ Patch5: condor_shared_libs.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
-BuildRequires: %_bindir/cmake
+# Explicitly request cmake >= 2.8.0, as this is not generally available on RHEL5 platforms
+BuildRequires: cmake >= 2.8.0
 BuildRequires: %_bindir/flex
 BuildRequires: %_bindir/byacc
 BuildRequires: pcre-devel
