@@ -23,6 +23,9 @@
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
 %define git_build 0
+# If building with git tarball, Fedora requests us to record the rev.  Use:
+# git log -1 --pretty=format:'%h'
+%define git_rev 8b70570
 %define git_build_man 0
 
 # Determine whether man pages will be included.
@@ -35,7 +38,16 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.0
-Release: 0.5%{?dist}
+
+# Only edit the %condor_base_release to bump the rev number
+%define condor_base_release 0.5
+%if %git_build
+%define condor_release %condor_base_release.%{git_rev}git
+%else
+%define condor_release %condor_base_release
+%endif
+Release: %condor_release%{?dist}
+
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
