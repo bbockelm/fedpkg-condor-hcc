@@ -385,6 +385,7 @@ popd
        -DWANT_HDFS:BOOL=FALSE \
        -DWANT_QUILL:BOOL=FALSE \
        -DWITH_ZLIB:BOOL=FALSE \
+       -DWITH_POSTGRESQL:BOOL=FALSE \
        -DWANT_CONTRIB:BOOL=ON \
 %if %aviary
        -DWITH_AVIARY:BOOL=TRUE \
@@ -440,7 +441,9 @@ populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
 rm -f %{buildroot}/%{_datadir}/condor/libclassads.a
 mv %{buildroot}%{_datadir}/condor/lib*.so %{buildroot}%{_libdir}/
 
+%if %aviary || %qmf
 populate %{_libdir}/condor/plugins %{buildroot}/%{_usr}/libexec/*-plugin.so
+%endif
 
 # It is proper to put Condor specific libexec binaries under libexec/condor/
 populate %_libexecdir/condor %{buildroot}/usr/libexec/*
@@ -498,8 +501,9 @@ mkdir -p -m0755 %{buildroot}/%{_var}/run/condor
 mkdir -p -m0755 %{buildroot}/%{_var}/log/condor
 mkdir -p -m0755 %{buildroot}/%{_var}/lock/condor
 mkdir -p -m1777 %{buildroot}/%{_var}/lock/condor/local
-mkdir -p -m0755 %{buildroot}/%{_sharedstatedir}/condor/spool
-mkdir -p -m1777 %{buildroot}/%{_sharedstatedir}/condor/execute
+# Note we use %{_var}/lib instead of %{_sharedstatedir} for RHEL5 compatibility
+mkdir -p -m0755 %{buildroot}/%{_var}/lib/condor/spool
+mkdir -p -m1777 %{buildroot}/%{_var}/lib/condor/execute
 
 cat >> %{buildroot}/%{_sharedstatedir}/condor/condor_config.local << EOF
 CONDOR_DEVELOPERS = NONE
