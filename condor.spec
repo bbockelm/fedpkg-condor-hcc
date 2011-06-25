@@ -407,7 +407,9 @@ popd
        -DWITH_LIBDELTACLOUD:BOOL=FALSE \
 %endif
        -DWITH_GLOBUS:BOOL=TRUE \
+%if %cgroups
        -DLIBCGROUP_FOUND_SEARCH_cgroup=/%{_lib}/libcgroup.so.1
+%endif
 
 # NOTE: I used to have these.  Check to see if they are still needed
 #       -DHAVE_BACKFILL:BOOL=TRUE \
