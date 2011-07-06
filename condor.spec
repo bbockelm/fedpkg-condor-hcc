@@ -19,6 +19,7 @@
 # Things not turned on, or don't have Fedora packages yet
 %define blahp 0
 %define qmf 0
+%define shared 0
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
@@ -33,6 +34,13 @@
 %define include_man 1
 %else
 %define include_man 0
+%endif
+
+# Special patches must be applied only to RHEL5
+%if 0%{?el5}
+%define rhel5 1
+%else
+%define rhel5 0
 %endif
 
 Summary: Condor: High Throughput Computing
@@ -104,12 +112,17 @@ Patch3: chkconfig_off.patch
 %if !%git_build
 Patch4: 7.7.0-catch-up.patch
 %endif
+%if %shared
 Patch5: condor_shared_libs.patch
+%endif
+
+%if %rhel5
+Patch6: cmake_26.patch
+%endif
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
-# Explicitly request cmake >= 2.8.0, as this is not generally available on RHEL5 platforms
-BuildRequires: cmake >= 2.8.0
+BuildRequires: cmake
 BuildRequires: %_bindir/flex
 BuildRequires: %_bindir/byacc
 BuildRequires: pcre-devel
@@ -355,7 +368,12 @@ exit 0
 %patch4 -p1
 %endif
 %patch0 -p1
+%if %shared
 %patch5 -p1
+%endif
+%if %rhel5
+%patch6 -p1
+%endif
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -441,7 +459,9 @@ populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
 # Except for the shared libs
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
 rm -f %{buildroot}/%{_datadir}/condor/libclassads.a
+%if %shared
 mv %{buildroot}%{_datadir}/condor/lib*.so %{buildroot}%{_libdir}/
+%endif
 
 %if %aviary || %qmf
 populate %{_libdir}/condor/plugins %{buildroot}/%{_usr}/libexec/*-plugin.so
@@ -507,7 +527,7 @@ mkdir -p -m1777 %{buildroot}/%{_var}/lock/condor/local
 mkdir -p -m0755 %{buildroot}/%{_var}/lib/condor/spool
 mkdir -p -m1777 %{buildroot}/%{_var}/lib/condor/execute
 
-cat >> %{buildroot}/%{_sharedstatedir}/condor/condor_config.local << EOF
+cat >> %{buildroot}/%_var/lib/condor/condor_config.local << EOF
 CONDOR_DEVELOPERS = NONE
 CONDOR_HOST = \$(FULL_HOSTNAME)
 COLLECTOR_NAME = Personal Condor
@@ -520,7 +540,7 @@ NEGOTIATOR_INTERVAL = 20
 EOF
 
 # this gets around a bug whose fix is not yet merged
-echo "TRUST_UID_DOMAIN = TRUE" >> %{buildroot}/%{_sharedstatedir}/condor/condor_config.local
+echo "TRUST_UID_DOMAIN = TRUE" >> %{buildroot}/%_var/lib/condor/condor_config.local
 
 # no master shutdown program for now
 rm %{buildroot}/%{_sbindir}/condor_set_shutdown
@@ -743,6 +763,9 @@ rm -rf %{buildroot}
 %_sbindir/condor_store_cred
 %_sbindir/condor_transferd
 %_sbindir/condor_updates_stats
+%if %gsoap
+%_sbindir/amazon_gahp
+%endif
 %_sbindir/ec2_gahp
 %_sbindir/condor_gridmanager
 %_sbindir/condor_gridshell
@@ -751,7 +774,9 @@ rm -rf %{buildroot}
 %_sbindir/nordugrid_gahp
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
+%if %shared
 %_libdir/lib*.so
+%endif
 #%_sbindir/condor_credd
 %config(noreplace) %_var/lib/condor/condor_config.local
 %defattr(-,condor,condor,-)
@@ -847,7 +872,12 @@ rm -rf %{buildroot}
 %doc LICENSE-2.0.txt NOTICE.txt
 %_libdir/libclassad.so.1
 %_libdir/libclassad.so.1.1.0
+# That's right; the internal library that Condor statically linked against
+# is called classads, while the exported one is classad.  Hopefully this
+# is resolved as the shared lib work is upstreamed.  For now, we deal.
+%if %shared
 %_libdir/libclassads.so
+%endif
 
 %files classads-devel
 %defattr(-,root,root,-)
