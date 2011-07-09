@@ -204,6 +204,7 @@ Requires: gsoap >= 2.7.12
 Requires: mailx
 Requires: python >= 2.2
 Requires: condor-classads = %{version}-%{release}
+Requires: condor-procd = %{version}-%{release}
 %if %blahp
 Requires: blahp >= 1.16.1
 %endif
@@ -242,6 +243,12 @@ chooses when and where to run the jobs based upon a policy, carefully
 monitors their progress, and ultimately informs the user upon
 completion.
 
+%package procd
+Summary: Condor Process tracking Daemon
+Group: Applications/System
+%description procd
+A daemon for tracking child processes started by a parent.
+Part of Condor, but able to be stand-alone
 
 %if %qmf
 %package qmf
@@ -417,7 +424,7 @@ popd
        -DWITH_TRIGGERD:BOOL=FALSE \
        -DWITH_MANAGEMENT:BOOL=FALSE \
 %endif
-       -DWANT_FULL_DEPLOYMENT:BOOL=FALSE \
+       -DWANT_FULL_DEPLOYMENT:BOOL=TRUE \
        -DWANT_GLEXEC:BOOL=FALSE \
 %if %deltacloud
        -DWITH_LIBDELTACLOUD:BOOL=TRUE \
@@ -572,10 +579,6 @@ rm %{buildroot}/%{_mandir}/man1/condor_master_off.1.gz
 rm %{buildroot}/%{_mandir}/man1/condor_reconfig_schedd.1.gz
 rm %{buildroot}/%{_mandir}/man1/condor_convert_history.1.gz
 
-# not packaging gidd_alloc or procd_ctl
-rm %{buildroot}/%{_mandir}/man1/gidd_alloc.1.gz
-rm %{buildroot}/%{_mandir}/man1/procd_ctl.1.gz
-
 # not packaging quill bits
 rm %{buildroot}/%{_mandir}/man1/condor_load_history.1.gz
 %endif
@@ -599,6 +602,55 @@ install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
 
+# Remove stuff that comes from the full-deploy
+rm -rf %{buildroot}%{_sbindir}/cleanup_release
+rm -rf %{buildroot}%{_sbindir}/condor_cleanup_local
+rm -rf %{buildroot}%{_sbindir}/condor_cold_start
+rm -rf %{buildroot}%{_sbindir}/condor_cold_stop
+rm -rf %{buildroot}%{_sbindir}/condor_config_bind
+rm -rf %{buildroot}%{_sbindir}/condor_configure
+rm -rf %{buildroot}%{_sbindir}/condor_credd
+rm -rf %{buildroot}%{_sbindir}/condor_install
+rm -rf %{buildroot}%{_sbindir}/condor_install_local
+rm -rf %{buildroot}%{_sbindir}/condor_local_start
+rm -rf %{buildroot}%{_sbindir}/condor_local_stop
+rm -rf %{buildroot}%{_sbindir}/condor_startd_factory
+rm -rf %{buildroot}%{_sbindir}/condor_vm-gahp-vmware
+rm -rf %{buildroot}%{_sbindir}/condor_vm_vmware.pl
+rm -rf %{buildroot}%{_sbindir}/filelock_midwife
+rm -rf %{buildroot}%{_sbindir}/filelock_undertaker
+rm -rf %{buildroot}%{_sbindir}/install_release
+rm -rf %{buildroot}%{_sbindir}/uniq_pid_command
+rm -rf %{buildroot}%{_sbindir}/uniq_pid_midwife
+rm -rf %{buildroot}%{_sbindir}/uniq_pid_undertaker
+rm -rf %{buildroot}%{_datadir}/condor/Execute.pm
+rm -rf %{buildroot}%{_datadir}/condor/ExecuteLock.pm
+rm -rf %{buildroot}%{_datadir}/condor/FileLock.pm
+rm -rf %{buildroot}%{_usrsrc}/chirp/chirp_*
+rm -rf %{buildroot}%{_usrsrc}/startd_factory
+rm -rf %{buildroot}/usr/DOC
+rm -rf %{buildroot}/usr/INSTALL
+rm -rf %{buildroot}/usr/LICENSE-2.0.txt
+rm -rf %{buildroot}/usr/README
+rm -rf %{buildroot}/usr/examples/
+rm -rf %{buildroot}%{_includedir}/MyString.h
+rm -rf %{buildroot}%{_includedir}/chirp_client.h
+rm -rf %{buildroot}%{_includedir}/compat_classad*
+rm -rf %{buildroot}%{_includedir}/condor_classad.h
+rm -rf %{buildroot}%{_includedir}/condor_constants.h
+rm -rf %{buildroot}%{_includedir}/condor_event.h
+rm -rf %{buildroot}%{_includedir}/condor_header_features.h
+rm -rf %{buildroot}%{_includedir}/condor_holdcodes.h
+rm -rf %{buildroot}%{_includedir}/file_lock.h
+rm -rf %{buildroot}%{_includedir}/iso_dates.h
+rm -rf %{buildroot}%{_includedir}/read_user_log.h
+rm -rf %{buildroot}%{_includedir}/stl_string_utils.h
+rm -rf %{buildroot}%{_includedir}/user_log.README
+rm -rf %{buildroot}%{_includedir}/user_log.c++.h
+rm -rf %{buildroot}%{_includedir}/write_user_log.h
+rm -rf %{buildroot}%{_libexecdir}/condor/bgp_*
+rm -rf %{buildroot}%{_datadir}/condor/libchirp_client.a
+rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
 
 %clean
 rm -rf %{buildroot}
@@ -672,7 +724,6 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_on.1.gz
 %_mandir/man1/condor_preen.1.gz
 %_mandir/man1/condor_prio.1.gz
-%_mandir/man1/condor_procd.1.gz
 %_mandir/man1/condor_q.1.gz
 %_mandir/man1/condor_qedit.1.gz
 %_mandir/man1/condor_reconfig.1.gz
@@ -751,7 +802,6 @@ rm -rf %{buildroot}
 %_sbindir/condor_off
 %_sbindir/condor_on
 %_sbindir/condor_preen
-%_sbindir/condor_procd
 %_sbindir/condor_reconfig
 %_sbindir/condor_replication
 %_sbindir/condor_restart
@@ -803,6 +853,16 @@ rm -rf %{buildroot}
 #%_usrsrc/chirp/chirp_client.c
 #%_usrsrc/chirp/chirp_client.h
 #%_usrsrc/chirp/chirp_protocol.h
+
+%files procd
+%_sbindir/condor_procd
+%_sbindir/gidd_alloc
+%_sbindir/procd_ctl
+%if %include_man
+%_mandir/man1/procd_ctl.1.gz
+%_mandir/man1/gidd_alloc.1.gz
+%_mandir/man1/condor_procd.1.gz
+%endif
 
 %if %qmf
 %files qmf
