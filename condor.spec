@@ -1031,6 +1031,9 @@ fi
 %endif
 
 %changelog
+* Tue Aug  10 2011 <tstclair@redhat.com> - 7.7.0-0.6
+- Rebuild deltacloud dep
+
 * Tue Jun  8 2011 <bbockelm@cse.unl.edu> - 7.7.0-0.5
 - Start to break build products into conditionals for future EPEL5 support.
 - Begun integration of a systemd service file.
