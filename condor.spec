@@ -706,6 +706,9 @@ fi
 
 
 %changelog
+* Wed Aug 10 2011 <tstclair@redhat.com> - 7.7.0-0.6
+- Rebuild for libdeltacloud mods
+
 * Tue Jun 14 2011 <matt@redhat> - 7.7.0-0.5
 - Enabled condor-qmf package
 
