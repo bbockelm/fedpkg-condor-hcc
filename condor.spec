@@ -3,7 +3,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.0
-Release: 0.5%{?dist}
+Release: 0.6%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
