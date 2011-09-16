@@ -1,9 +1,9 @@
-%define tarball_version 7.6.0
+%define tarball_version 7.7.1
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.7.0
-Release: 0.7%{?dist}
+Version: 7.7.1
+Release: 0.1%{?dist}
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -29,14 +29,17 @@ URL: http://www.cs.wisc.edu/condor/
 #   108a4b91cd10deca1554ca1088be6c8c  condor_src-7.4.4-all-all.tar.gz
 #   b482c4bfa350164427a1952113d53d03  condor_src-7.5.5-all-all.tar.gz
 #   2a1355cb24a56a71978d229ddc490bc5  condor_src-7.6.0-all-all.tar.gz
+#
+#   From here on out:
+#     git archive --format=tar --prefix=condor-7.7.1/ V7_7_1 | gzip >condor_src-7.7.1-all-all.tar.gz
+#
+#   ecafed3e183e9fc6608dc9e55e4dd59b  condor_src-7.7.1-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.6.0-327697-RH.tar.gz
+Source0: condor-7.7.1-UPSTREAM-GT.tar.gz
 Source1: generate-tarball.sh
 Source2: %{name}-tmpfiles.conf
 Patch0: condor_config.generic.patch
-Patch3: chkconfig_off.patch
-Patch4: 7.7.0-catch-up.patch
-
+Patch1: chkconfig_off.patch
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires: %_bindir/cmake
@@ -44,20 +47,21 @@ BuildRequires: %_bindir/flex
 BuildRequires: %_bindir/byacc
 BuildRequires: pcre-devel
 #BuildRequires: postgresql-devel
+#BuildRequires: gsoap-devel >= 2.7.12-1
 BuildRequires: openssl-devel
 BuildRequires: krb5-devel
-#BuildRequires: gsoap-devel >= 2.7.12-1
 BuildRequires: libvirt-devel
 BuildRequires: bind-utils
 BuildRequires: m4
-#BuildRequires: autoconf
 BuildRequires: libX11-devel
 BuildRequires: wso2-wsf-cpp-devel
 BuildRequires: wso2-axis2-devel
 BuildRequires: /usr/include/curl/curl.h
 BuildRequires: /usr/include/expat.h
+BuildRequires: /usr/include/ldap.h
 BuildRequires: qpid-qmf-devel
 BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
+BuildRequires: latex2html
 
 # Globus GSI build requirements
 BuildRequires: globus-gssapi-gsi-devel
@@ -85,7 +89,6 @@ BuildRequires: globus-ftp-control-devel
 BuildRequires: libtool-ltdl-devel
 BuildRequires: voms-devel
 
-#Requires: gsoap >= 2.7.12
 Requires: mailx
 Requires: python >= 2.2
 Requires: condor-classads = %{version}-%{release}
@@ -104,7 +107,6 @@ Requires(postun):/sbin/service
 
 Obsoletes: condor-static < 7.2.0
 
-
 %description
 Condor is a specialized workload management system for
 compute-intensive jobs. Like other full-featured batch systems, Condor
@@ -115,17 +117,7 @@ chooses when and where to run the jobs based upon a policy, carefully
 monitors their progress, and ultimately informs the user upon
 completion.
 
-
-#%package static
-#Summary: Headers and libraries for interacting with Condor
-#Group: Development/System
-#Requires: %name = %version-%release
-#
-#
-#%description static
-#Headers and libraries for interacting with Condor and its components.
-
-
+#######################
 %package qmf
 Summary: Condor QMF components
 Group: Applications/System
@@ -138,7 +130,7 @@ Obsoletes: condor-qmf-plugins
 %description qmf
 Components to connect Condor to the QMF management bus.
 
-
+#######################
 %package aviary
 Summary: Condor Aviary components
 Group: Applications/System
@@ -148,7 +140,7 @@ Requires: condor-classads = %{version}-%{release}
 %description aviary
 Components to provide simplified WS interface to Condor.
 
-
+#######################
 %package kbdd
 Summary: Condor Keyboard Daemon
 Group: Applications/System
@@ -160,7 +152,7 @@ The condor_kbdd monitors logged in X users for activity. It is only
 useful on systems where no device (e.g. /dev/*) can be used to
 determine console idle time.
 
-
+#######################
 %package vm-gahp
 Summary: Condor's VM Gahp
 Group: Applications/System
@@ -173,7 +165,7 @@ The condor_vm-gahp enables the Virtual Machine Universe feature of
 Condor. The VM Universe uses libvirt to start and control VMs under
 Condor's Startd.
 
-
+#######################
 %package deltacloud-gahp
 Summary: Condor's Deltacloud Gahp
 Group: Applications/System
@@ -183,7 +175,7 @@ Requires: %name = %version-%release
 The deltacloud_gahp enables Condor's ability to manage jobs run on
 resources exposed by the deltacloud API.
 
-
+#######################
 %package classads
 Summary: Condor's classified advertisement language
 Group: Development/Libraries
@@ -211,6 +203,7 @@ matching is used by the Condor central manager to determine the
 compatibility of jobs and workstations where they may be run.
 
 
+#######################
 %package classads-devel
 Summary: Headers for Condor's classified advertisement language
 Group: Development/System
@@ -234,13 +227,10 @@ exit 0
 %prep
 %setup -q -n %{name}-%{tarball_version}
 
-%patch3 -p1
-%patch4 -p1
 %patch0 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
-
 
 %build
 %cmake -DNO_PHONE_HOME:BOOL=TRUE \
@@ -260,6 +250,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_TRIGGERD:BOOL=TRUE \
        -DWANT_FULL_DEPLOYMENT:BOOL=FALSE \
        -DWANT_GLEXEC:BOOL=FALSE \
+       -DWANT_MAN_PAGES:BOOL=TRUE \
        -DWITH_LIBDELTACLOUD:BOOL=TRUE \
        -DWITH_GLOBUS:BOOL=TRUE
 make %{?_smp_mflags}
@@ -286,7 +277,7 @@ populate %_sysconfdir/condor %{buildroot}/%{_usr}/lib/condor_ssh_to_job_sshd_con
 populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
 # Except for libclassad
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
-rm -f %{buildroot}/%{_datadir}/condor/libclassads.a
+rm -f %{buildroot}/%{_datadir}/condor/libclassad.a
 
 populate %{_libdir}/condor/plugins %{buildroot}/%{_usr}/libexec/*-plugin.so
 
@@ -338,37 +329,37 @@ mkdir -p -m1777 %{buildroot}/%{_sharedstatedir}/condor/execute
 
 # no master shutdown program for now
 rm %{buildroot}/%{_sbindir}/condor_set_shutdown
-rm %{buildroot}/%{_mandir}/man1/condor_set_shutdown.1.gz
+rm %{buildroot}/%{_mandir}/man1/condor_set_shutdown.1
 
 # not packaging deployment tools
-rm %{buildroot}/%{_mandir}/man1/condor_config_bind.1.gz
-rm %{buildroot}/%{_mandir}/man1/condor_cold_start.1.gz
-rm %{buildroot}/%{_mandir}/man1/condor_cold_stop.1.gz
-rm %{buildroot}/%{_mandir}/man1/uniq_pid_midwife.1.gz
-rm %{buildroot}/%{_mandir}/man1/uniq_pid_undertaker.1.gz
-rm %{buildroot}/%{_mandir}/man1/filelock_midwife.1.gz
-rm %{buildroot}/%{_mandir}/man1/filelock_undertaker.1.gz
-rm %{buildroot}/%{_mandir}/man1/install_release.1.gz
-rm %{buildroot}/%{_mandir}/man1/cleanup_release.1.gz
+rm %{buildroot}/%{_mandir}/man1/condor_config_bind.1
+rm %{buildroot}/%{_mandir}/man1/condor_cold_start.1
+rm %{buildroot}/%{_mandir}/man1/condor_cold_stop.1
+rm %{buildroot}/%{_mandir}/man1/uniq_pid_midwife.1
+rm %{buildroot}/%{_mandir}/man1/uniq_pid_undertaker.1
+rm %{buildroot}/%{_mandir}/man1/filelock_midwife.1
+rm %{buildroot}/%{_mandir}/man1/filelock_undertaker.1
+rm %{buildroot}/%{_mandir}/man1/install_release.1
+rm %{buildroot}/%{_mandir}/man1/cleanup_release.1
 
 # not packaging standard universe
-rm %{buildroot}/%{_mandir}/man1/condor_compile.1.gz
-rm %{buildroot}/%{_mandir}/man1/condor_checkpoint.1.gz
+rm %{buildroot}/%{_mandir}/man1/condor_compile.1
+rm %{buildroot}/%{_mandir}/man1/condor_checkpoint.1
 
 # not packaging configure/install scripts
-rm %{buildroot}/%{_mandir}/man1/condor_configure.1.gz
+rm %{buildroot}/%{_mandir}/man1/condor_configure.1
 
 # not packaging legacy cruft
-rm %{buildroot}/%{_mandir}/man1/condor_master_off.1.gz
-rm %{buildroot}/%{_mandir}/man1/condor_reconfig_schedd.1.gz
-rm %{buildroot}/%{_mandir}/man1/condor_convert_history.1.gz
+#rm %{buildroot}/%{_mandir}/man1/condor_master_off.1
+#rm %{buildroot}/%{_mandir}/man1/condor_reconfig_schedd.1
+rm %{buildroot}/%{_mandir}/man1/condor_convert_history.1
 
 # not packaging gidd_alloc or procd_ctl
-rm %{buildroot}/%{_mandir}/man1/gidd_alloc.1.gz
-rm %{buildroot}/%{_mandir}/man1/procd_ctl.1.gz
+rm %{buildroot}/%{_mandir}/man1/gidd_alloc.1
+rm %{buildroot}/%{_mandir}/man1/procd_ctl.1
 
 # not packaging quill bits
-rm %{buildroot}/%{_mandir}/man1/condor_load_history.1.gz
+rm %{buildroot}/%{_mandir}/man1/condor_load_history.1
 
 # Remove junk
 rm -r %{buildroot}/%{_sysconfdir}/sysconfig
@@ -394,7 +385,7 @@ rm -rf %{buildroot}
 #cd condor_tests
 #make check-seralized
 
-
+#################
 %files
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt examples
@@ -516,6 +507,7 @@ rm -rf %{buildroot}
 %_bindir/condor_glidein
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
+%_sbindir/condor
 %_sbindir/condor_advertise
 %_sbindir/condor_c-gahp
 %_sbindir/condor_c-gahp_worker_thread
@@ -545,7 +537,7 @@ rm -rf %{buildroot}
 %_sbindir/condor_gridshell
 %_sbindir/gahp_server
 %_sbindir/grid_monitor.sh
-#%_sbindir/nordugrid_gahp -- needs ldap.h
+%_sbindir/nordugrid_gahp
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
 #%_sbindir/condor_credd
@@ -554,27 +546,11 @@ rm -rf %{buildroot}
 %dir %_var/lib/condor/execute/
 %dir %_var/log/condor/
 %dir %_var/lib/condor/spool/
-%dir %_var/lock/condor/
-%dir %_var/run/condor/
+%ghost %dir %_var/lock/condor/
+%ghost %dir %_var/run/condor/
 
 
-#%files static
-#%defattr(-,root,root,-)
-#%doc LICENSE-2.0.txt
-#%_libdir/libcondorapi.a
-#%dir %_includedir/condor/
-#%_includedir/condor/condor_constants.h
-#%_includedir/condor/condor_event.h
-#%_includedir/condor/condor_holdcodes.h
-#%_includedir/condor/file_lock.h
-#%_includedir/condor/user_log.c++.h
-#%doc %_includedir/condor/user_log.README
-#%dir %_usrsrc/chirp/
-#%_usrsrc/chirp/chirp_client.c
-#%_usrsrc/chirp/chirp_client.h
-#%_usrsrc/chirp/chirp_protocol.h
-
-
+#################
 %files qmf
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
@@ -591,6 +567,7 @@ rm -rf %{buildroot}
 %_sbindir/condor_job_server
 
 
+#################
 %files aviary
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
@@ -615,12 +592,14 @@ rm -rf %{buildroot}
 %_var/lib/condor/aviary/services/query/aviary-query.wsdl
 
 
+#################
 %files kbdd
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
 %_sbindir/condor_kbdd
 
 
+#################
 %files vm-gahp
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
@@ -630,18 +609,22 @@ rm -rf %{buildroot}
 %_libexecdir/condor/libvirt_simple_script.awk
 
 
+#################
 %files deltacloud-gahp
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
 %_sbindir/deltacloud_gahp
 
 
+#################
 %files classads
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
-%_libdir/libclassad.so.1
-%_libdir/libclassad.so.1.1.0
+%_libdir/libclassad.so.2
+%_libdir/libclassad.so.2.0.0
 
+
+#################
 %files classads-devel
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
@@ -704,8 +687,11 @@ if [ "$1" -ge "1" ]; then
 fi
 /sbin/ldconfig
 
-
 %changelog
+* Fri Sep 16 2011 <tstclair@redhat.com> - 7.7.1-0.1
+- Fast forward to 7.7.1 official release tag V7_7_1
+- ghost var/lock and var/run in spec (BZ656562)
+
 * Wed Aug 10 2011 <tstclair@redhat.com> - 7.7.0-0.7
 - Rebuild for libdeltacloud mods
 
