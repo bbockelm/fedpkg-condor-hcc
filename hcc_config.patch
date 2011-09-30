@@ -1,0 +1,24 @@
+--- a/src/condor_examples//condor_config.generic.orig	2011-05-17 08:19:40.000000000 -0500
++++ b/src/condor_examples/condor_config.generic	2011-05-17 08:26:48.000000000 -0500
+@@ -77,7 +77,7 @@
+ ##  Where is the local condor directory for each host?  
+ ##  This is where the local config file(s), logs and
+ ##  spool/execute directories are located
+-LOCAL_DIR		= $(TILDE)
++LOCAL_DIR		= /var
+ #LOCAL_DIR		= $(RELEASE_DIR)/hosts/$(HOSTNAME)
+ 
+ ## Looking for LOCAL_CONFIG_FILE? You will not find it here. Instead
+@@ -969,9 +969,10 @@
+ ######################################################################
+ 
+ ##  Pathnames
++LOCAL_CONFIG_FILE      = $(LOCAL_DIR)/lib/condor/condor_config.local
+ LOG		= /var/log/condor
+-SPOOL		= $(LOCAL_DIR)/spool
+-EXECUTE		= $(LOCAL_DIR)/execute
++SPOOL		= $(LOCAL_DIR)/lib/condor/spool
++EXECUTE		= $(LOCAL_DIR)/lib/condor/execute
+ BIN		= $(RELEASE_DIR)/bin
+ LIB		= $(RELEASE_DIR)/lib
+ INCLUDE		= $(RELEASE_DIR)/include/condor
