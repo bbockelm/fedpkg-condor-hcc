@@ -17,7 +17,7 @@
 
 # Things not turned on, or don't have Fedora packages yet
 %define blahp 0
-%define glexec 0
+%define glexec 1
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
@@ -29,7 +29,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.1
-%define condor_base_release 0.1
+%define condor_base_release 0.2
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
 %else
@@ -88,6 +88,9 @@ Source3: condor.service
 %endif
 Patch0: condor_config.generic.patch
 Patch1: chkconfig_off.patch
+
+Patch8: hcc_config.patch
+Patch9: condor_glexec_as_root_v3.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -155,6 +158,9 @@ Requires: libcgroup >= 0.37
 %if %blahp
 Requires: blahp >= 1.16.1
 %endif
+%if %glexec
+Requires: glexec
+%endif
 
 %if %systemd
 BuildRequires: systemd-units
@@ -167,9 +173,6 @@ Requires: condor-procd = %{version}-%{release}
 
 %if %blahp
 Requires: blahp >= 1.16.1
-%endif
-%if %glexec
-Requires: glexec
 %endif
 # libcgroup < 0.37 has a bug that invalidates our accounting.
 Requires: libcgroup >= 0.37
@@ -334,6 +337,9 @@ exit 0
 %endif
 
 %patch0 -p1
+
+%patch8 -p1
+%patch9 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -923,6 +929,9 @@ fi
 %endif
 
 %changelog
+* Fri Sep 30 2011 Brian Bockelman <bbockelm@cse.unl.edu> - 7.7.1-0.2
+- Enable glexec builds.
+
 * Fri Sep 16 2011 <tstclair@redhat.com> - 7.7.1-0.1
 - Fast forward to 7.7.1 official release tag V7_7_1
 - ghost var/lock and var/run in spec (BZ656562)
@@ -941,15 +950,27 @@ fi
 - Fast forward to 7.7.0 pre-release at 1babb324
 - Catch libdeltacloud 0.8 update
 
+* Mon May 23 2011 Brian Bockelman <bbockelm@cse.unl.edu> - 7.6.1-0.11.pre
+- Begin systemd integration
+
 * Fri May 20 2011 <matt@redhat> - 7.7.0-0.2
 - Added GSI support, dependency on Globus
 
-* Fri May 13 2011 <matt@redhat> - 7.7.0-0.1
-- Fast forward to 7.7.0 pre-release at 79952d6b
-- Introduced ec2_gahp
-- 79952d6b brings schema expectations inline with Cumin
+* Tue May 17 2011 Brian Bockelman <bbockelm@cse.unl.edu> - 7.6.1-0.7.pre
+- Fix #2162; have spooling and URL plugins interact correctly
+- Merge with upstream git repo.
 
-* Tue May 10 2011 <matt@redhat> - 7.6.1-0.1
+* Mon May 2 2011 Brian Bockelman <bbockelm@cse.unl.edu> - 7.6.1-0.4.pre
+- Enable cgroups.
+
+* Fri Apr 29 2011 Brian Bockelman <bbockelm@cse.unl.edu> - 7.6.1-0.3.pre
+- Build for https://condor-wiki.cs.wisc.edu/index.cgi/tktview?tn=2109, allowing SubmitterUserResourcesInUse to be weighted.
+
+* Fri Apr 29 2011 Brian Bockelman <bbockelm@cse.unl.edu> - 7.6.1-0.2.pre
+- HCC pre-release of 7.6.1 for negotiator fixes.
+
+* Thu Apr 28 2011 <matt@redhat> - 7.6.1-0.1
+- Upgrade to 7.6.0 release, pre-release of 7.6.1 at 27972e8
 - Upgrade to 7.6.0 release, pre-release of 7.6.1 at 5617a464
 - Upstreamed patch: log_lock_run.patch
 - Introduced condor-classads to obsolete classads
