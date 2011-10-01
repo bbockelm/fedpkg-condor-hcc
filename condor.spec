@@ -17,6 +17,7 @@
 
 # Things not turned on, or don't have Fedora packages yet
 %define blahp 0
+%define glexec 0
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
@@ -24,13 +25,6 @@
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
 %define git_rev 8b70570
-
-# Special patches must be applied only to RHEL5
-%if 0%{?el5}
-%define rhel5 1
-%else
-%define rhel5 0
-%endif
 
 Summary: Condor: High Throughput Computing
 Name: condor
@@ -112,7 +106,6 @@ BuildRequires: /usr/include/expat.h
 BuildRequires: openldap-devel
 BuildRequires: /usr/include/ldap.h
 BuildRequires: qpid-qmf-devel
-BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
 BuildRequires: latex2html
 
 # Globus GSI build requirements
@@ -171,6 +164,16 @@ Requires: mailx
 Requires: python >= 2.2
 Requires: condor-classads = %{version}-%{release}
 Requires: condor-procd = %{version}-%{release}
+
+%if %blahp
+Requires: blahp >= 1.16.1
+%endif
+%if %glexec
+Requires: glexec
+%endif
+# libcgroup < 0.37 has a bug that invalidates our accounting.
+Requires: libcgroup >= 0.37
+
 Requires: initscripts
 
 Requires(pre): shadow-utils
@@ -332,10 +335,6 @@ exit 0
 
 %patch0 -p1
 
-%if %rhel5
-%patch6 -p1
-%endif
-
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 
@@ -367,7 +366,11 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_MANAGEMENT:BOOL=FALSE \
 %endif
        -DWANT_FULL_DEPLOYMENT:BOOL=TRUE \
+%if %glexec
+       -DWANT_GLEXEC:BOOL=TRUE \
+%else
        -DWANT_GLEXEC:BOOL=FALSE \
+%endif
        -DWANT_MAN_PAGES:BOOL=TRUE \
 %if %deltacloud
        -DWITH_LIBDELTACLOUD:BOOL=TRUE \
@@ -461,22 +464,6 @@ mkdir -p -m1777 %{buildroot}/%{_var}/lock/condor/local
 mkdir -p -m0755 %{buildroot}/%{_var}/lib/condor/spool
 mkdir -p -m1777 %{buildroot}/%{_var}/lib/condor/execute
 
-## NOTE: This type of config mod should be contained in the patch 
-##       process.  
-#cat >> %{buildroot}/%_var/lib/condor/condor_config.local << EOF
-#CONDOR_DEVELOPERS = NONE
-#CONDOR_HOST = \$(FULL_HOSTNAME)
-#COLLECTOR_NAME = Personal Condor
-#START = TRUE
-#SUSPEND = FALSE
-#PREEMPT = FALSE
-#KILL = FALSE
-#DAEMON_LIST = COLLECTOR, MASTER, NEGOTIATOR, SCHEDD, STARTD
-#NEGOTIATOR_INTERVAL = 20
-#EOF
-# this gets around a bug whose fix is not yet merged
-#echo "TRUST_UID_DOMAIN = TRUE" >> %{buildroot}/%_var/lib/condor/condor_config.local
-
 # no master shutdown program for now
 rm %{buildroot}/%{_sbindir}/condor_set_shutdown
 rm %{buildroot}/%{_mandir}/man1/condor_set_shutdown.1
@@ -504,10 +491,6 @@ rm %{buildroot}/%{_mandir}/man1/condor_configure.1
 #rm %{buildroot}/%{_mandir}/man1/condor_reconfig_schedd.1
 rm %{buildroot}/%{_mandir}/man1/condor_convert_history.1
 
-# not packaging gidd_alloc or procd_ctl
-rm %{buildroot}/%{_mandir}/man1/gidd_alloc.1
-rm %{buildroot}/%{_mandir}/man1/procd_ctl.1
-
 # not packaging quill bits
 rm %{buildroot}/%{_mandir}/man1/condor_load_history.1
 
@@ -524,13 +507,19 @@ mkdir -p %{buildroot}%{_unitdir}
 cp %{SOURCE3} %{buildroot}%{_unitdir}/condor.service
 %else
 # install the lsb init script
+mkdir -p %{buildroot}/%{_sysconfdir}/sysconfig
+touch %{buildroot}/%{_sysconfdir}/sysconfig/condor
 install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
 %endif
 
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
 
-## NOTE: commented out b/c full-deploy=false
+# rsh is built if glexec is on.  No. Clue. Why.
+%if %glexec
+rm %{buildroot}%{_libexecdir}/condor/rsh
+%endif
+
 # Remove stuff that comes from the full-deploy
 rm -rf %{buildroot}%{_sbindir}/cleanup_release
 rm -rf %{buildroot}%{_sbindir}/condor_cleanup_local
@@ -600,6 +589,7 @@ rm -rf %{buildroot}
 %config(noreplace) %_sysconfdir/tmpfiles.d/%{name}.conf
 %{_unitdir}/condor.service
 %else
+%config(noreplace) %_sysconfdir/sysconfig/condor
 %_initrddir/condor
 %endif
 %dir %_datadir/condor/
@@ -619,7 +609,14 @@ rm -rf %{buildroot}
 %_libexecdir/condor/sshd.sh
 %_libexecdir/condor/condor_job_router
 %_libexecdir/condor/gridftp_wrapper.sh
-#%_libexecdir/condor/condor_glexec_update_proxy
+%if %glexec
+%_libexecdir/condor/condor_glexec_setup
+%_libexecdir/condor/condor_glexec_run
+%_libexecdir/condor/condor_glexec_job_wrapper
+%_libexecdir/condor/condor_glexec_update_proxy
+%_libexecdir/condor/condor_glexec_cleanup
+%_libexecdir/condor/condor_glexec_kill
+%endif
 %_libexecdir/condor/condor_limits_wrapper.sh
 %_libexecdir/condor/condor_rooster
 %_libexecdir/condor/condor_ssh_to_job_shell_setup
@@ -744,7 +741,6 @@ rm -rf %{buildroot}
 %_sbindir/nordugrid_gahp
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
-#%_sbindir/condor_credd
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
@@ -757,8 +753,8 @@ rm -rf %{buildroot}
 %_sbindir/condor_procd
 %_sbindir/gidd_alloc
 %_sbindir/procd_ctl
-#%_mandir/man1/procd_ctl.1.gz
-#%_mandir/man1/gidd_alloc.1.gz
+%_mandir/man1/procd_ctl.1.gz
+%_mandir/man1/gidd_alloc.1.gz
 %_mandir/man1/condor_procd.1.gz
 
 #################
