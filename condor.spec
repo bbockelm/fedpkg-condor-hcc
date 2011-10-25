@@ -1,4 +1,4 @@
-%define tarball_version 7.7.1
+%define tarball_version 7.7.2
 
 # Things for F15 or later
 %if 0%{?fedora} >= 15
@@ -28,7 +28,7 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.7.1
+Version: 7.7.2
 %define condor_base_release 0.2
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
@@ -78,7 +78,7 @@ Source0: condor.tar.gz
 #
 #   ecafed3e183e9fc6608dc9e55e4dd59b  condor_src-7.7.1-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.7.1-UPSTREAM-GT.tar.gz
+Source0: condor_src-7.7.2-all-all.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -676,6 +676,8 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_ssh_to_job.1.gz
 %_mandir/man1/condor_power.1.gz
 %_mandir/man1/condor_glidein.1.gz
+%_mandir/man1/condor_continue.1.gz
+%_mandir/man1/condor_suspend.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
 %_bindir/condor
 %_bindir/condor_submit_dag
@@ -713,6 +715,8 @@ rm -rf %{buildroot}
 %_bindir/condor_gather_info
 %_bindir/condor_test_match
 %_bindir/condor_glidein
+%_bindir/condor_continue
+%_bindir/condor_suspend
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
 %_sbindir/condor
@@ -834,8 +838,8 @@ rm -rf %{buildroot}
 %files classads
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
+%_libdir/libclassad.so.7.7.2
 %_libdir/libclassad.so.2
-%_libdir/libclassad.so.2.0.0
 
 #################
 %files classads-devel
