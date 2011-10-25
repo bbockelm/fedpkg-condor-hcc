@@ -1,15 +1,17 @@
-%define tarball_version 7.7.1
+%define tarball_version 7.7.3
 
 # Things for F15 or later
 %if 0%{?fedora} >= 15
 %define deltacloud 1
 %define aviary 1
+%define plumage 1
 %define systemd 1
 %define cgroups 1
 %define qmf 1
 %else
 %define deltacloud 0
 %define aviary 0
+%define plumage 0
 %define systemd 0
 %define cgroups 0
 %define qmf 0
@@ -28,7 +30,7 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.7.1
+Version: 7.7.3
 %define condor_base_release 0.1
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
@@ -77,8 +79,9 @@ Source0: condor.tar.gz
 #     git archive --format=tar --prefix=condor-7.7.1/ V7_7_1 | gzip >condor_src-7.7.1-all-all.tar.gz
 #
 #   ecafed3e183e9fc6608dc9e55e4dd59b  condor_src-7.7.1-all-all.tar.gz
+#   6a7a42515d5ae6c8cb3c69492697e04f  condor_src-7.7.3-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.7.1-UPSTREAM-GT.tar.gz
+Source0: condor-7.7.3-c39a8b84-GIT.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -145,6 +148,10 @@ BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
 %if %aviary
 BuildRequires: wso2-wsf-cpp-devel
 BuildRequires: wso2-axis2-devel
+%endif
+
+%if %plumage
+BuildRequires: mongodb-devel >= 1.6.4-3
 %endif
 
 %if %cgroups
@@ -237,6 +244,20 @@ Requires: condor-classads = %{version}-%{release}
 
 %description aviary
 Components to provide simplified WS interface to Condor.
+%endif
+
+%if %plumage
+%package plumage
+Summary: Condor Plumage components
+Group: Applications/System
+Requires: %name = %version-%release
+Requires: condor-classads = %{version}-%{release}
+Requires: mongodb >= 1.6.4
+Requires: pymongo >= 1.9
+Requires: python-dateutil >= 1.4.1
+
+%description plumage
+Components to provide a NoSQL operational data store for Condor.
 %endif
 
 #######################
@@ -333,7 +354,7 @@ exit 0
 %setup -q -n %{name}-%{tarball_version}
 %endif
 
-%patch0 -p1
+%patch0 -p1 -F 2
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -353,6 +374,11 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_ZLIB:BOOL=FALSE \
        -DWITH_POSTGRESQL:BOOL=FALSE \
        -DWANT_CONTRIB:BOOL=ON \
+%if %plumage
+       -DWITH_PLUMAGE:BOOL=TRUE \
+%else
+       -DWITH_PLUMAGE:BOOL=FALSE \
+%endif
 %if %aviary
        -DWITH_AVIARY:BOOL=TRUE \
 %else
@@ -454,6 +480,14 @@ populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/61aviary.config
 mkdir -p %{buildroot}/%{_var}/lib/condor/aviary
 populate %{_var}/lib/condor/aviary %{buildroot}/usr/axis2.xml
 populate %{_var}/lib/condor/aviary %{buildroot}/usr/services/
+%endif
+
+%if %plumage
+# Install condor-plumage's base plugin configuration
+populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/62plumage.config
+rm -f %{buildroot}/%{_bindir}/ods_job_etl_tool
+rm -f %{buildroot}/%{_sbindir}/ods_job_etl_server
+mkdir -p -m0755 %{buildroot}/%{_var}/lib/condor/ViewHist
 %endif
 
 mkdir -p -m0755 %{buildroot}/%{_var}/run/condor
@@ -567,7 +601,7 @@ rm -rf %{buildroot}%{_includedir}/user_log.README
 rm -rf %{buildroot}%{_includedir}/user_log.c++.h
 rm -rf %{buildroot}%{_includedir}/write_user_log.h
 rm -rf %{buildroot}%{_libexecdir}/condor/bgp_*
-rm -rf %{buildroot}%{_datadir}/condor/libchirp_client.a
+rm -rf %{buildroot}%{_datadir}/condor/libchirp_client.*
 rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
 
 %clean
@@ -666,6 +700,8 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_version.1.gz
 %_mandir/man1/condor_wait.1.gz
 %_mandir/man1/condor_router_history.1.gz
+%_mandir/man1/condor_continue.1.gz
+%_mandir/man1/condor_suspend.1.gz
 %_mandir/man1/condor_router_q.1.gz
 %_mandir/man1/condor_ssh_to_job.1.gz
 %_mandir/man1/condor_power.1.gz
@@ -705,6 +741,8 @@ rm -rf %{buildroot}
 %_bindir/condor_ssh_to_job
 %_bindir/condor_power
 %_bindir/condor_gather_info
+%_bindir/condor_continue
+%_bindir/condor_suspend
 %_bindir/condor_test_match
 %_bindir/condor_glidein
 # sbin/condor is a link for master_off, off, on, reconfig,
@@ -741,6 +779,7 @@ rm -rf %{buildroot}
 %_sbindir/nordugrid_gahp
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
+%_datadir/condor/libcondor_utils.so
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
@@ -784,6 +823,22 @@ rm -rf %{buildroot}
 %dir %_libdir/condor/plugins
 %_libdir/condor/plugins/AviaryScheddPlugin-plugin.so
 %_sbindir/aviary_query_server
+%dir %_datadir/condor/aviary
+%_datadir/condor/aviary/jobcontrol.py*
+%_datadir/condor/aviary/jobquery.py*
+%_datadir/condor/aviary/submissions.py*
+%_datadir/condor/aviary/submit.py*
+%_datadir/condor/aviary/setattr.py*
+%dir %_datadir/condor/aviary/dag
+%_datadir/condor/aviary/dag/diamond.dag
+%_datadir/condor/aviary/dag/dag-submit.py*
+%_datadir/condor/aviary/dag/job.sub
+%dir %_datadir/condor/aviary/module
+%_datadir/condor/aviary/module/aviary/util.py*
+%_datadir/condor/aviary/module/aviary/https.py*
+%_datadir/condor/aviary/module/aviary/__init__.py*
+%_datadir/condor/aviary/README
+%defattr(-,condor,condor,-)
 %dir %_var/lib/condor/aviary
 %_var/lib/condor/aviary/axis2.xml
 %dir %_var/lib/condor/aviary/services
@@ -799,6 +854,20 @@ rm -rf %{buildroot}
 %_var/lib/condor/aviary/services/query/aviary-common.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.wsdl
+%endif
+
+%if %plumage
+%files plumage
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sysconfdir/condor/config.d/62plumage.config
+%dir %_libdir/condor/plugins
+%_libdir/condor/plugins/ODSCollectorPlugin-plugin.so
+%dir %_datadir/condor/plumage
+%_bindir/plumage_stats
+%_datadir/condor/plumage/README
+%defattr(-,condor,condor,-)
+%dir %_var/lib/condor/ViewHist
 %endif
 
 #################
@@ -829,7 +898,7 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
 %_libdir/libclassad.so.2
-%_libdir/libclassad.so.2.0.0
+%_libdir/libclassad.so.7.7.3
 
 #################
 %files classads-devel
@@ -923,6 +992,9 @@ fi
 %endif
 
 %changelog
+* Tue Oct 25 2011 <tstclair@redhat.com> - 7.7.3-0.1
+- Fast forward to 7.7.3 pre release
+
 * Fri Sep 16 2011 <tstclair@redhat.com> - 7.7.1-0.1
 - Fast forward to 7.7.1 official release tag V7_7_1
 - ghost var/lock and var/run in spec (BZ656562)
