@@ -13,7 +13,7 @@
  ######################################################################
  
  ##  Pathnames
-+LOCAL_CONFIG_FILE      = $(LOCAL_DIR)/lib/condor/condor_config.local
++#LOCAL_CONFIG_FILE      = $(LOCAL_DIR)/lib/condor/condor_config.local
  LOG		= /var/log/condor
 -SPOOL		= $(LOCAL_DIR)/spool
 -EXECUTE		= $(LOCAL_DIR)/execute
