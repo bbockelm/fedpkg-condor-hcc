@@ -432,6 +432,7 @@ populate %_sysconfdir/condor %{buildroot}/%{_usr}/lib/condor_ssh_to_job_sshd_con
 populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
 # Except for the shared libs
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
+populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libcondor_utils.so
 rm -f %{buildroot}/%{_datadir}/condor/libclassad.a
 
 %if %aviary || %qmf
@@ -578,6 +579,7 @@ rm -rf %{buildroot}%{_sbindir}/uniq_pid_undertaker
 rm -rf %{buildroot}%{_datadir}/condor/Execute.pm
 rm -rf %{buildroot}%{_datadir}/condor/ExecuteLock.pm
 rm -rf %{buildroot}%{_datadir}/condor/FileLock.pm
+rm -rf %{buildroot}%{_datadir}/condor/Condor.pm
 rm -rf %{buildroot}%{_usrsrc}/chirp/chirp_*
 rm -rf %{buildroot}%{_usrsrc}/startd_factory
 rm -rf %{buildroot}/usr/DOC
@@ -630,7 +632,8 @@ rm -rf %{buildroot}
 %_datadir/condor/Chirp.jar
 %_datadir/condor/CondorJavaInfo.class
 %_datadir/condor/CondorJavaWrapper.class
-%_datadir/condor/Condor.pm
+# dep problem in 7.7.3
+#%_datadir/condor/Condor.pm
 %_datadir/condor/scimark2lib.jar
 %_datadir/condor/gt4-gahp.jar
 %_datadir/condor/gt42-gahp.jar
@@ -707,6 +710,7 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_power.1.gz
 %_mandir/man1/condor_glidein.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
+%_libdir/libcondor_utils.so
 %_bindir/condor
 %_bindir/condor_submit_dag
 %_bindir/condor_prio
@@ -779,7 +783,6 @@ rm -rf %{buildroot}
 %_sbindir/nordugrid_gahp
 %_sbindir/gt4_gahp
 %_sbindir/gt42_gahp
-%_datadir/condor/libcondor_utils.so
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
