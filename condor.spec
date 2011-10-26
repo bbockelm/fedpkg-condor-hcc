@@ -1,4 +1,4 @@
-%define tarball_version 7.7.2
+%define tarball_version 7.7.3
 
 # Things for F15 or later
 %if 0%{?fedora} >= 15
@@ -21,15 +21,15 @@
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
-%define git_build 0
+%define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 8b70570
+%define git_rev c39a8b8
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.7.2
-%define condor_base_release 0.2
+Version: 7.7.3
+%define condor_base_release 0.1
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
 %else
@@ -90,7 +90,6 @@ Patch0: condor_config.generic.patch
 Patch1: chkconfig_off.patch
 
 Patch8: hcc_config.patch
-Patch9: condor_glexec_as_root_v3.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -339,7 +338,6 @@ exit 0
 %patch0 -p1
 
 %patch8 -p1
-%patch9 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -838,7 +836,7 @@ rm -rf %{buildroot}
 %files classads
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
-%_libdir/libclassad.so.7.7.2
+%_libdir/libclassad.so.%{version}
 %_libdir/libclassad.so.2
 
 #################
