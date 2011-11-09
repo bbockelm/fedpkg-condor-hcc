@@ -26,7 +26,7 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev c39a8b8
+%define git_rev 73158a2
 
 Summary: Condor: High Throughput Computing
 Name: condor
@@ -110,7 +110,6 @@ BuildRequires: /usr/include/curl/curl.h
 BuildRequires: /usr/include/expat.h
 BuildRequires: openldap-devel
 BuildRequires: /usr/include/ldap.h
-BuildRequires: qpid-qmf-devel
 BuildRequires: latex2html
 
 # Globus GSI build requirements
@@ -584,6 +583,9 @@ rm -rf %{buildroot}%{_datadir}/condor/Execute.pm
 rm -rf %{buildroot}%{_datadir}/condor/ExecuteLock.pm
 rm -rf %{buildroot}%{_datadir}/condor/FileLock.pm
 rm -rf %{buildroot}%{_datadir}/condor/Condor.pm
+rm -rf %{buildroot}%{_datadir}/condor/CondorPersonal.pm
+rm -rf %{buildroot}%{_datadir}/condor/CondorTest.pm
+rm -rf %{buildroot}%{_datadir}/condor/CondorUtils.pm
 rm -rf %{buildroot}%{_usrsrc}/chirp/chirp_*
 rm -rf %{buildroot}%{_usrsrc}/startd_factory
 rm -rf %{buildroot}/usr/DOC
