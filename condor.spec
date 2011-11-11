@@ -31,7 +31,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.3
-%define condor_base_release 0.1
+%define condor_base_release 0.2
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
 %else
@@ -538,8 +538,12 @@ rm -r %{buildroot}/%{_sysconfdir}/init.d
 mkdir -p %{buildroot}%{_sysconfdir}/tmpfiles.d
 install -m 0644 %{SOURCE2} %{buildroot}%{_sysconfdir}/tmpfiles.d/%{name}.conf
 
+mkdir -p %{buildroot}%{_localstatedir}/run/
+install -d -m 0710 %{buildroot}%{_localstatedir}/run/%{name}/
+
 mkdir -p %{buildroot}%{_unitdir}
 cp %{SOURCE3} %{buildroot}%{_unitdir}/condor.service
+
 %else
 # install the lsb init script
 mkdir -p %{buildroot}/%{_sysconfdir}/sysconfig
@@ -622,6 +626,7 @@ rm -rf %{buildroot}
 %dir %_sysconfdir/condor/
 %config(noreplace) %_sysconfdir/condor/condor_config
 %if %systemd
+%dir %{_localstatedir}/run/%{name}/
 %config(noreplace) %_sysconfdir/tmpfiles.d/%{name}.conf
 %{_unitdir}/condor.service
 %else
@@ -947,6 +952,7 @@ rm -rf %{buildroot}
 if [ $1 -eq 1 ] ; then
     # Initial installation 
     /bin/systemctl daemon-reload >/dev/null 2>&1 || :
+    /bin/systemd-tmpfiles --create /etc/tmpfiles.d/%{name}.conf 2>&1 || :
 fi
 
 %preun
@@ -995,6 +1001,9 @@ fi
 %endif
 
 %changelog
+* Fri Nov 11 2011 <tstclair@redhat.com> - 7.7.3-0.2
+- Update install process for tmpfiles.d
+
 * Tue Oct 25 2011 <tstclair@redhat.com> - 7.7.3-0.1
 - Fast forward to 7.7.3 pre release
 
