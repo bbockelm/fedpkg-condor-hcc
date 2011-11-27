@@ -4,7 +4,12 @@
 %if 0%{?fedora} >= 15
 %define deltacloud 1
 %define aviary 1
+%ifarch %{ix86} x86_64
+# mongodb supports only x86/x86_64
 %define plumage 1
+%else
+%define plumage 0
+%endif
 %define systemd 1
 %define cgroups 1
 %define qmf 1
@@ -31,7 +36,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.3
-%define condor_base_release 0.2
+%define condor_base_release 0.3
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
 %else
@@ -1001,6 +1006,9 @@ fi
 %endif
 
 %changelog
+* Sun Nov 27 2011 Dan Horák <dan[at]danny.cz> - 7.7.3-0.3
+- mongodb supports only x86/x86_64 => limit plumage subpackage to these arches
+
 * Fri Nov 11 2011 <tstclair@redhat.com> - 7.7.3-0.2
 - Update install process for tmpfiles.d
 
