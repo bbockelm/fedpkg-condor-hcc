@@ -1,4 +1,4 @@
-%define tarball_version 7.7.3
+%define tarball_version 7.7.5
 
 # Things for F15 or later
 %if 0%{?fedora} >= 15
@@ -14,7 +14,7 @@
 %define plumage 0
 %define systemd 0
 %define cgroups 0
-%define qmf 0
+%define qmf 1
 %endif
 
 # Things not turned on, or don't have Fedora packages yet
@@ -26,12 +26,12 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev f60fe95
+%define git_rev c42c744
 
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.5
-%define condor_base_release 0.1
+%define condor_base_release 0.3
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
 %else
@@ -387,6 +387,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %else
        -DWITH_AVIARY:BOOL=FALSE \
 %endif
+       -DWITH_PIGEON:BOOL=FALSE \
 %if %qmf
        -DWITH_TRIGGERD:BOOL=TRUE \
        -DWITH_MANAGEMENT:BOOL=TRUE \
@@ -553,11 +554,6 @@ install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
 
-# rsh is built if glexec is on.  No. Clue. Why.
-#%if %glexec
-#rm %{buildroot}%{_libexecdir}/condor/rsh
-#%endif
-
 # Remove stuff that comes from the full-deploy
 rm -rf %{buildroot}%{_sbindir}/cleanup_release
 rm -rf %{buildroot}%{_sbindir}/condor_cleanup_local
@@ -711,8 +707,6 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_version.1.gz
 %_mandir/man1/condor_wait.1.gz
 %_mandir/man1/condor_router_history.1.gz
-%_mandir/man1/condor_continue.1.gz
-%_mandir/man1/condor_suspend.1.gz
 %_mandir/man1/condor_router_q.1.gz
 %_mandir/man1/condor_ssh_to_job.1.gz
 %_mandir/man1/condor_power.1.gz
@@ -798,18 +792,17 @@ rm -rf %{buildroot}
 %dir %_var/lib/condor/execute/
 %dir %_var/log/condor/
 %dir %_var/lib/condor/spool/
+%if %systemd
 %ghost %dir %_var/lock/condor/
 %ghost %dir %_var/run/condor/
+%else
+%dir %_var/lock/condor
+%dir %_var/run/condor
+%endif
 
 # For Condor 7.7.5
 %_bindir/condor_drain
-%_bindir/condor_pigeon_topic_listener
-%_bindir/condor_pigeon_topic_publisher
 %_libexecdir/condor/condor_defrag
-%_sbindir/condor_pigeon
-%_sbindir/daemonReader
-%_sbindir/declareQueues
-
 
 %files procd
 %_sbindir/condor_procd
