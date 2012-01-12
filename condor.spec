@@ -42,7 +42,7 @@ Version: 7.7.3
 %else
 	%define condor_release %condor_base_release
 %endif
-Release: %condor_release%{?dist}
+Release: %condor_release%{?dist}.1
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -1006,6 +1006,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan 12 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.7.3-0.3.1
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_17_Mass_Rebuild
+
 * Sun Nov 27 2011 Dan Horák <dan[at]danny.cz> - 7.7.3-0.3
 - mongodb supports only x86/x86_64 => limit plumage subpackage to these arches
 
