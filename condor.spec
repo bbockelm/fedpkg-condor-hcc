@@ -1,4 +1,4 @@
-%define tarball_version 7.7.3
+%define tarball_version 7.7.5
 
 # Things for F15 or later
 %if 0%{?fedora} >= 15
@@ -35,8 +35,8 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.7.3
-%define condor_base_release 0.3
+Version: 7.7.5
+%define condor_base_release 0.1
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
 %else
@@ -85,8 +85,9 @@ Source0: condor.tar.gz
 #
 #   ecafed3e183e9fc6608dc9e55e4dd59b  condor_src-7.7.1-all-all.tar.gz
 #   6a7a42515d5ae6c8cb3c69492697e04f  condor_src-7.7.3-all-all.tar.gz
+#   d9e3e51f49835c6edbb511dce2232692  condor_src-7.7.5-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.7.3-c39a8b84-GIT.tar.gz
+Source0: condor-7.7.5-03a0f934-GIT.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -359,7 +360,7 @@ exit 0
 %setup -q -n %{name}-%{tarball_version}
 %endif
 
-%patch0 -p1 -F 2
+%patch0 -p1 -F 3
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -379,6 +380,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_ZLIB:BOOL=FALSE \
        -DWITH_POSTGRESQL:BOOL=FALSE \
        -DWANT_CONTRIB:BOOL=ON \
+       -DWITH_PIGEON:BOOL=FALSE \
 %if %plumage
        -DWITH_PLUMAGE:BOOL=TRUE \
 %else
@@ -585,10 +587,8 @@ rm -rf %{buildroot}%{_sbindir}/install_release
 rm -rf %{buildroot}%{_sbindir}/uniq_pid_command
 rm -rf %{buildroot}%{_sbindir}/uniq_pid_midwife
 rm -rf %{buildroot}%{_sbindir}/uniq_pid_undertaker
-rm -rf %{buildroot}%{_datadir}/condor/Execute.pm
-rm -rf %{buildroot}%{_datadir}/condor/ExecuteLock.pm
-rm -rf %{buildroot}%{_datadir}/condor/FileLock.pm
-rm -rf %{buildroot}%{_datadir}/condor/Condor.pm
+rm -rf %{buildroot}%{_datadir}/condor/*.pm
+rm -rf %{buildroot}%{_datadir}/condor/Chirp.jar
 rm -rf %{buildroot}%{_usrsrc}/chirp/chirp_*
 rm -rf %{buildroot}%{_usrsrc}/startd_factory
 rm -rf %{buildroot}/usr/DOC
@@ -631,22 +631,21 @@ rm -rf %{buildroot}
 %dir %_sysconfdir/condor/
 %config(noreplace) %_sysconfdir/condor/condor_config
 %if %systemd
-%dir %{_localstatedir}/run/%{name}/
 %config(noreplace) %_sysconfdir/tmpfiles.d/%{name}.conf
 %{_unitdir}/condor.service
 %else
+%dir %{_localstatedir}/run/%{name}/
 %config(noreplace) %_sysconfdir/sysconfig/condor
 %_initrddir/condor
 %endif
 %dir %_datadir/condor/
-%_datadir/condor/Chirp.jar
+#%_datadir/condor/Chirp.jar
 %_datadir/condor/CondorJavaInfo.class
 %_datadir/condor/CondorJavaWrapper.class
-# dep problem in 7.7.3
 #%_datadir/condor/Condor.pm
 %_datadir/condor/scimark2lib.jar
-%_datadir/condor/gt4-gahp.jar
-%_datadir/condor/gt42-gahp.jar
+#%_datadir/condor/gt4-gahp.jar
+#%_datadir/condor/gt42-gahp.jar
 %dir %_sysconfdir/condor/config.d/
 %_sysconfdir/condor/config.d/00personal_condor.config
 %_sysconfdir/condor/condor_ssh_to_job_sshd_config_template
@@ -655,7 +654,7 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_ssh
 %_libexecdir/condor/sshd.sh
 %_libexecdir/condor/condor_job_router
-%_libexecdir/condor/gridftp_wrapper.sh
+#%_libexecdir/condor/gridftp_wrapper.sh
 %if %glexec
 %_libexecdir/condor/condor_glexec_setup
 %_libexecdir/condor/condor_glexec_run
@@ -676,6 +675,8 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_shared_port
 %_libexecdir/condor/condor_glexec_wrapper
 %_libexecdir/condor/glexec_starter_setup.sh
+%_libexecdir/condor/condor_defrag
+%_libexecdir/condor/condor_schedd.init
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
 %_mandir/man1/condor_chirp.1.gz
@@ -721,7 +722,7 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_glidein.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
 %_libdir/libcondor_utils.so
-%_bindir/condor
+#%_bindir/condor
 %_bindir/condor_submit_dag
 %_bindir/condor_prio
 %_bindir/condor_transfer_data
@@ -759,9 +760,10 @@ rm -rf %{buildroot}
 %_bindir/condor_suspend
 %_bindir/condor_test_match
 %_bindir/condor_glidein
+%_bindir/condor_drain
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
-%_sbindir/condor
+#%_sbindir/condor
 %_sbindir/condor_advertise
 %_sbindir/condor_c-gahp
 %_sbindir/condor_c-gahp_worker_thread
@@ -791,8 +793,8 @@ rm -rf %{buildroot}
 %_sbindir/gahp_server
 %_sbindir/grid_monitor.sh
 %_sbindir/nordugrid_gahp
-%_sbindir/gt4_gahp
-%_sbindir/gt42_gahp
+#%_sbindir/gt4_gahp
+#%_sbindir/gt42_gahp
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
@@ -838,6 +840,7 @@ rm -rf %{buildroot}
 %_sbindir/aviary_query_server
 %dir %_datadir/condor/aviary
 %_datadir/condor/aviary/jobcontrol.py*
+%_datadir/condor/aviary/jobinventory.py*
 %_datadir/condor/aviary/jobquery.py*
 %_datadir/condor/aviary/submissions.py*
 %_datadir/condor/aviary/submit.py*
@@ -911,7 +914,7 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
 %_libdir/libclassad.so.2
-%_libdir/libclassad.so.7.7.3
+%_libdir/libclassad.so.%{tarball_version}
 
 #################
 %files classads-devel
@@ -1006,6 +1009,9 @@ fi
 %endif
 
 %changelog
+* Thu Feb 9 2012 <tstclair@redhat.com> - 7.7.5-0.1
+- Fast forward to 7.7.5 pre release
+
 * Sun Nov 27 2011 Dan Horák <dan[at]danny.cz> - 7.7.3-0.3
 - mongodb supports only x86/x86_64 => limit plumage subpackage to these arches
 
