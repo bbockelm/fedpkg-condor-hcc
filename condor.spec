@@ -42,7 +42,7 @@ Version: 7.7.5
 %else
 	%define condor_release %condor_base_release
 %endif
-Release: %condor_release%{?dist}.1
+Release: %condor_release%{?dist}.2
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -1009,6 +1009,9 @@ fi
 %endif
 
 %changelog
+* Fri Feb 10 2012 Petr Pisar <ppisar@redhat.com> - 7.7.5-0.1.2
+- Rebuild against PCRE 8.30
+
 * Thu Feb 9 2012 <tstclair@redhat.com> - 7.7.5-0.1
 - Fast forward to 7.7.5 pre release
 
