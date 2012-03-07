@@ -85,9 +85,9 @@ Source0: condor.tar.gz
 #
 #   ecafed3e183e9fc6608dc9e55e4dd59b  condor_src-7.7.1-all-all.tar.gz
 #   6a7a42515d5ae6c8cb3c69492697e04f  condor_src-7.7.3-all-all.tar.gz
-#   e941854c58c885e898e33ca6a3ef683b  condor_src-7.7.5-all-all.tar.gz
+#   32727366db9d0dcd57f5a41f2352f40d  condor_src-7.7.5-all-all.tar.gz
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.7.5-e5e734c8-GIT.tar.gz
+Source0: condor-7.7.5-e5e734c8-2-GIT.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -559,8 +559,7 @@ install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/
 %endif
 
 # we must place the config examples in builddir so %doc can find them
-rm -rf %{buildroot}/etc/examples 
-#%{_builddir}/%{name}-%{tarball_version}
+mv %{buildroot}/etc/examples %{_builddir}/%{name}-%{tarball_version}
 
 # rsh is built if glexec is on.  No. Clue. Why.
 %if %glexec
