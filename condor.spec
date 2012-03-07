@@ -36,7 +36,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.7.5
-%define condor_base_release 0.1
+%define condor_base_release 0.2
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
 %else
@@ -1010,6 +1010,9 @@ fi
 %endif
 
 %changelog
+* Thu Mar 7 2012 <tstclair@redhat.com> - 7.7.5-0.2
+- Fast forward to 7.7.5 release
+
 * Thu Feb 9 2012 <tstclair@redhat.com> - 7.7.5-0.1
 - Fast forward to 7.7.5 pre release
 
