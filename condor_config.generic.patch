@@ -205,7 +205,7 @@ index a800f31..80ad566 100644
  ## Determine if the Negotiator will honor SlotWeight attributes, which
  ## may be used to give a slot greater weight when calculating usage.
  #NEGOTIATOR_USE_SLOT_WEIGHTS = True
-+NEGOTIATOR_USE_SLOT_WEIGHTS = False
++NEGOTIATOR_USE_SLOT_WEIGHTS = True
  
  
  ## How often the Negotaitor starts a negotiation cycle, defined in
