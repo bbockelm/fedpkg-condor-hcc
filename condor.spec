@@ -1,4 +1,4 @@
-%define tarball_version 7.7.5
+%define tarball_version 7.9.0
 
 # Things for F15 or later
 %if 0%{?fedora} >= 15
@@ -35,8 +35,8 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.7.5
-%define condor_base_release 0.2
+Version: 7.9.0
+%define condor_base_release 0.1
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
 %else
@@ -86,8 +86,10 @@ Source0: condor.tar.gz
 #   ecafed3e183e9fc6608dc9e55e4dd59b  condor_src-7.7.1-all-all.tar.gz
 #   6a7a42515d5ae6c8cb3c69492697e04f  condor_src-7.7.3-all-all.tar.gz
 #   32727366db9d0dcd57f5a41f2352f40d  condor_src-7.7.5-all-all.tar.gz
+#   5306421d1b937233b6f07caea9872e29  condor_src-7.9.0-all-all.tar.gz
+#
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.7.5-e5e734c8-2-GIT.tar.gz
+Source0: condor-7.9.0-3b0e7b0c-GIT.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -152,8 +154,8 @@ BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
 %endif
 
 %if %aviary
-BuildRequires: wso2-wsf-cpp-devel
-BuildRequires: wso2-axis2-devel
+BuildRequires: wso2-wsf-cpp-devel >= 2.1.0-4
+BuildRequires: wso2-axis2-devel >= 2.1.0-4
 %endif
 
 %if %plumage
@@ -415,7 +417,8 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DLIBCGROUP_FOUND_SEARCH_cgroup=/%{_lib}/libcgroup.so.1
 %endif
 
-make %{?_smp_mflags}
+make 
+#%{?_smp_mflags}
 
 
 %install
@@ -438,8 +441,8 @@ populate %_sysconfdir/condor %{buildroot}/%{_usr}/lib/condor_ssh_to_job_sshd_con
 # Things in /usr/lib really belong in /usr/share/condor
 populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
 # Except for the shared libs
-populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
-populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libcondor_utils.so
+populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.s*
+populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libcondor_utils*.so
 rm -f %{buildroot}/%{_datadir}/condor/libclassad.a
 
 %if %aviary || %qmf
@@ -580,7 +583,7 @@ rm -rf %{buildroot}%{_sbindir}/condor_local_start
 rm -rf %{buildroot}%{_sbindir}/condor_local_stop
 rm -rf %{buildroot}%{_sbindir}/condor_startd_factory
 rm -rf %{buildroot}%{_sbindir}/condor_vm-gahp-vmware
-rm -rf %{buildroot}%{_sbindir}/condor_vm_vmware.pl
+rm -rf %{buildroot}%{_sbindir}/condor_vm_vmwar*
 rm -rf %{buildroot}%{_sbindir}/filelock_midwife
 rm -rf %{buildroot}%{_sbindir}/filelock_undertaker
 rm -rf %{buildroot}%{_sbindir}/install_release
@@ -614,6 +617,9 @@ rm -rf %{buildroot}%{_includedir}/write_user_log.h
 rm -rf %{buildroot}%{_libexecdir}/condor/bgp_*
 rm -rf %{buildroot}%{_datadir}/condor/libchirp_client.*
 rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
+# Remove some cluster suite stuff which doesn't work in 
+#rm -f %{buildroot}/etc/examples/cmd_cluster.rb
+#rm -f %{buildroot}/etc/examples/condor.sh
 
 %clean
 rm -rf %{buildroot}
@@ -721,7 +727,7 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_power.1.gz
 %_mandir/man1/condor_glidein.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
-%_libdir/libcondor_utils.so
+%_libdir/libcondor_utils_7_9_0.so
 #%_bindir/condor
 %_bindir/condor_submit_dag
 %_bindir/condor_prio
@@ -791,7 +797,9 @@ rm -rf %{buildroot}
 %_sbindir/condor_gridmanager
 %_sbindir/condor_gridshell
 %_sbindir/gahp_server
+%_sbindir/grid_monitor
 %_sbindir/grid_monitor.sh
+%_sbindir/remote_gahp
 %_sbindir/nordugrid_gahp
 #%_sbindir/gt4_gahp
 #%_sbindir/gt42_gahp
@@ -837,12 +845,15 @@ rm -rf %{buildroot}
 %_sysconfdir/condor/config.d/61aviary.config
 %dir %_libdir/condor/plugins
 %_libdir/condor/plugins/AviaryScheddPlugin-plugin.so
+%_libdir/condor/plugins/AviaryLocatorPlugin-plugin.so
 %_sbindir/aviary_query_server
 %dir %_datadir/condor/aviary
 %_datadir/condor/aviary/jobcontrol.py*
 %_datadir/condor/aviary/jobinventory.py*
 %_datadir/condor/aviary/jobquery.py*
+%_datadir/condor/aviary/locator.py*
 %_datadir/condor/aviary/submissions.py*
+%_datadir/condor/aviary/submission_ids.py*
 %_datadir/condor/aviary/submit.py*
 %_datadir/condor/aviary/setattr.py*
 %dir %_datadir/condor/aviary/dag
@@ -870,6 +881,11 @@ rm -rf %{buildroot}
 %_var/lib/condor/aviary/services/query/aviary-common.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.wsdl
+%_var/lib/condor/aviary/services/locator/aviary-common.xsd
+%_var/lib/condor/aviary/services/locator/aviary-locator.wsdl
+%_var/lib/condor/aviary/services/locator/aviary-locator.xsd
+%_var/lib/condor/aviary/services/locator/libaviary_locator_axis.so
+%_var/lib/condor/aviary/services/locator/services.xml
 %endif
 
 %if %plumage
@@ -882,6 +898,10 @@ rm -rf %{buildroot}
 %dir %_datadir/condor/plumage
 %_bindir/plumage_stats
 %_datadir/condor/plumage/README
+%_datadir/condor/plumage/SCHEMA
+%_datadir/condor/plumage/plumage_accounting
+%_datadir/condor/plumage/plumage_scheduler
+%_datadir/condor/plumage/plumage_utilization
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/ViewHist
 %endif
@@ -913,7 +933,7 @@ rm -rf %{buildroot}
 %files classads
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
-%_libdir/libclassad.so.2
+%_libdir/libclassad.so.3
 %_libdir/libclassad.so.%{tarball_version}
 
 #################
@@ -1009,6 +1029,9 @@ fi
 %endif
 
 %changelog
+* Fri Apr 27 2012 <tstclair@redhat.com> - 7.9.0-0.1
+- Fast forward to 7.9.0 pre-release
+
 * Thu Mar 7 2012 <tstclair@redhat.com> - 7.7.5-0.2
 - Fast forward to 7.7.5 release
 
