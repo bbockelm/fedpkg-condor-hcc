@@ -93,7 +93,7 @@ Source1: generate-tarball.sh
 
 %if %systemd
 Source2: %{name}-tmpfiles.conf
-Source3: condor.service
+Source3: %{name}.service
 %endif
 Patch0: condor_config.generic.patch
 Patch1: chkconfig_off.patch
@@ -379,6 +379,11 @@ exit 0
 %patch9 -p1
 %patch10 -p1
 
+%if %systemd
+cp %{SOURCE2} %{name}-tmpfiles.conf
+cp %{SOURCE3} %{name}.service
+%endif
+
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 
@@ -566,10 +571,10 @@ rm -r %{buildroot}/%{_sysconfdir}/init.d
 %if %systemd
 # install tmpfiles.d/condor.conf
 mkdir -p %{buildroot}%{_sysconfdir}/tmpfiles.d
-install -m 0644 %{SOURCE2} %{buildroot}%{_sysconfdir}/tmpfiles.d/%{name}.conf
+install -m 0644 %{name}-tmpfiles.conf %{buildroot}%{_sysconfdir}/tmpfiles.d/%{name}.conf
 
 mkdir -p %{buildroot}%{_unitdir}
-cp %{SOURCE3} %{buildroot}%{_unitdir}/condor.service
+cp %{name}.service %{buildroot}%{_unitdir}/condor.service
 %else
 # install the lsb init script
 mkdir -p %{buildroot}/%{_sysconfdir}/sysconfig
@@ -922,6 +927,10 @@ rm -rf %{buildroot}
 %dir %_datadir/condor/plumage
 %_bindir/plumage_stats
 %_datadir/condor/plumage/README
+%_datadir/condor/plumage/SCHEMA
+%_datadir/condor/plumage/plumage_accounting
+%_datadir/condor/plumage/plumage_scheduler
+%_datadir/condor/plumage/plumage_utilization
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/ViewHist
 %endif
