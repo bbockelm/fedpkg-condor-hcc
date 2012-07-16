@@ -158,23 +158,6 @@
  
  ##  Lock files
  SHADOW_LOCK	= $(LOCK)/ShadowLock
-@@ -1078,7 +1125,7 @@
- #DC_DAEMON_LIST = \
- #MASTER, STARTD, SCHEDD, KBDD, COLLECTOR, NEGOTIATOR, EVENTD, \
- #VIEW_SERVER, CONDOR_VIEW, VIEW_COLLECTOR, HAWKEYE, CREDD, HAD, \
--#DBMSD, QUILL, JOB_ROUTER, ROOSTER, LEASEMANAGER, HDFS, SHARED_PORT
-+#DBMSD, QUILL, JOB_ROUTER, ROOSTER, LEASEMANAGER, HDFS, SHARED_PORT, TRIGGERD
- 
- 
- ##  Where are the binaries for these daemons?
-@@ -1094,6 +1141,7 @@
- HDFS				= $(SBIN)/condor_hdfs
- SHARED_PORT			= $(LIBEXEC)/condor_shared_port
- TRANSFERER			= $(LIBEXEC)/condor_transferer
-+TRIGGERD			= $(sbin)/condor_triggerd
- 
- ##  When the master starts up, it can place it's address (IP and port)
- ##  into a file.  This way, tools running on the local machine don't
 @@ -1170,11 +1218,13 @@
  ##--------------------------------------------------------------------
  ## Address to which Condor will send a weekly e-mail with output of
@@ -195,7 +178,7 @@
  ## Determine if the Negotiator will honor SlotWeight attributes, which
  ## may be used to give a slot greater weight when calculating usage.
  #NEGOTIATOR_USE_SLOT_WEIGHTS = True
-+NEGOTIATOR_USE_SLOT_WEIGHTS = False
++NEGOTIATOR_USE_SLOT_WEIGHTS = True
  
  
  ## How often the Negotaitor starts a negotiation cycle, defined in

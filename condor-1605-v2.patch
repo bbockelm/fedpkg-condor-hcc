@@ -1,0 +1,1457 @@
+diff --git a/src/condor_c-gahp/schedd_client.cpp b/src/condor_c-gahp/schedd_client.cpp
+index 32f0059..b8fda84 100644
+--- a/src/condor_c-gahp/schedd_client.cpp
++++ b/src/condor_c-gahp/schedd_client.cpp
+@@ -562,7 +562,7 @@ doContactSchedd()
+ 	// Try connecting to the queue
+ 	Qmgr_connection * qmgr_connection;
+ 	
+-	if ((qmgr_connection = ConnectQ(dc_schedd.addr(), QMGMT_TIMEOUT, false, NULL, NULL, dc_schedd.version() )) == NULL) {
++	if ((qmgr_connection = ConnectQ(dc_schedd, QMGMT_TIMEOUT, false, NULL, NULL, dc_schedd.version() )) == NULL) {
+ 		error = TRUE;
+ 		sprintf( error_msg, "Error connecting to schedd %s", ScheddAddr );
+ 		dprintf( D_ALWAYS, "%s\n", error_msg.c_str() );
+diff --git a/src/condor_contrib/triggerd/src/Triggerd.cpp b/src/condor_contrib/triggerd/src/Triggerd.cpp
+index 40e1197..59f2e55 100644
+--- a/src/condor_contrib/triggerd/src/Triggerd.cpp
++++ b/src/condor_contrib/triggerd/src/Triggerd.cpp
+@@ -819,7 +819,7 @@ Triggerd::PerformQueries()
+          // Perform the query and check the result
+          if (NULL != query_collector)
+          {
+-            status = query->fetchAds(result, query_collector->addr(), &errstack);
++            status = query->fetchAds(result, *query_collector, &errstack);
+          }
+          else
+          {
+diff --git a/src/condor_credd/credd.cpp b/src/condor_credd/credd.cpp
+index 7f0973f..c3b7b1f 100644
+--- a/src/condor_credd/credd.cpp
++++ b/src/condor_credd/credd.cpp
+@@ -80,7 +80,7 @@ store_cred_handler(Service * /*service*/, int /*i*/, Stream *stream) {
+ 
+   if (!socket->triedAuthentication()) { 
+     CondorError errstack;
+-    if( ! SecMan::authenticate_sock(socket, WRITE, &errstack) ) {
++    if( ! SecMan::authenticate_sock(socket, WRITE, &errstack, NULL) ) {
+       dprintf (D_ALWAYS, "Unable to authenticate, qutting\n");
+       goto EXIT;
+     }
+@@ -236,7 +236,7 @@ get_cred_handler(Service * /*service*/, int /*i*/, Stream *stream) {
+   // Authenticate
+   if (!socket->triedAuthentication()) {
+     CondorError errstack;
+-    if( ! SecMan::authenticate_sock(socket, READ, &errstack) ) {
++    if( ! SecMan::authenticate_sock(socket, READ, &errstack, NULL) ) {
+       dprintf (D_ALWAYS, "Unable to authenticate, qutting\n");
+       goto EXIT;
+     }
+@@ -351,7 +351,7 @@ query_cred_handler(Service * /*service*/, int /*i*/, Stream *stream) {
+ 
+   if (!socket->triedAuthentication()) {
+     CondorError errstack;
+-    if( ! SecMan::authenticate_sock(socket, READ, &errstack) ) {
++    if( ! SecMan::authenticate_sock(socket, READ, &errstack, NULL) ) {
+       dprintf (D_ALWAYS, "Unable to authenticate, qutting\n");
+       goto EXIT;
+     }
+@@ -426,7 +426,7 @@ rm_cred_handler(Service * /*service*/, int /*i*/, Stream *stream) {
+ 
+   if (!socket->triedAuthentication()) {
+     CondorError errstack;
+-    if( ! SecMan::authenticate_sock(socket, READ, &errstack) ) {
++    if( ! SecMan::authenticate_sock(socket, READ, &errstack, NULL) ) {
+       dprintf (D_ALWAYS, "Unable to authenticate, qutting\n");
+       goto EXIT;
+     }
+diff --git a/src/condor_daemon_client/daemon.cpp b/src/condor_daemon_client/daemon.cpp
+index e2afded..5ccb2aa 100644
+--- a/src/condor_daemon_client/daemon.cpp
++++ b/src/condor_daemon_client/daemon.cpp
+@@ -162,7 +162,7 @@ Daemon::Daemon( const ClassAd* tAd, daemon_t tType, const char* tPool )
+ 
+ 	getInfoFromAd( tAd );
+ 
+-	dprintf( D_HOSTNAME, "New Daemon obj (%s) name: \"%s\", pool: "
++	dprintf( D_HOSTNAME, "From ClassAd, new Daemon obj (%s) name: \"%s\", pool: "
+ 			 "\"%s\", addr: \"%s\"\n", daemonString(_type), 
+ 			 _name ? _name : "NULL", _pool ? _pool : "NULL",
+ 			 _addr ? _addr : "NULL" );
+@@ -533,7 +533,7 @@ Daemon::connectSock(Sock *sock, int sec, CondorError* errstack, bool non_blockin
+ 
+ 
+ StartCommandResult
+-Daemon::startCommand( int cmd, Sock* sock, int timeout, CondorError *errstack, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking, char const *cmd_description, char *, SecMan *sec_man, bool raw_protocol, char const *sec_session_id )
++Daemon::startCommand( int cmd, Sock* sock, int timeout, CondorError *errstack, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking, char const *cmd_description, char *, SecMan *sec_man, bool raw_protocol, char const *sec_session_id, const char * hostname )
+ {
+ 	// This function may be either blocking or non-blocking, depending
+ 	// on the flag that is passed in.  All versions of Daemon::startCommand()
+@@ -555,7 +555,7 @@ Daemon::startCommand( int cmd, Sock* sock, int timeout, CondorError *errstack, S
+ 		sock->timeout( timeout );
+ 	}
+ 
+-	start_command_result = sec_man->startCommand(cmd, sock, raw_protocol, errstack, 0, callback_fn, misc_data, nonblocking, cmd_description, sec_session_id);
++	start_command_result = sec_man->startCommand(cmd, sock, raw_protocol, errstack, 0, callback_fn, misc_data, nonblocking, cmd_description, sec_session_id, hostname);
+ 
+ 	if(callback_fn) {
+ 		// SecMan::startCommand() called the callback function, so we just return here
+@@ -619,7 +619,8 @@ Daemon::startCommand( int cmd, Stream::stream_type st,Sock **sock,int timeout, C
+ 						 _version,
+ 						 &_sec_man,
+ 						 raw_protocol,
+-						 sec_session_id);
++						 sec_session_id,
++						 _full_hostname);
+ }
+ 
+ Sock*
+@@ -662,7 +663,7 @@ Daemon::startCommand_nonblocking( int cmd, Sock* sock, int timeout, CondorError
+ {
+ 	// This is the nonblocking version of startCommand().
+ 	const bool nonblocking = true;
+-	return startCommand(cmd,sock,timeout,errstack,callback_fn,misc_data,nonblocking,cmd_description,_version,&_sec_man,raw_protocol,sec_session_id);
++	return startCommand(cmd,sock,timeout,errstack,callback_fn,misc_data,nonblocking,cmd_description,_version,&_sec_man,raw_protocol,sec_session_id, _full_hostname);
+ }
+ 
+ bool
+@@ -670,7 +671,7 @@ Daemon::startCommand( int cmd, Sock* sock, int timeout, CondorError *errstack, c
+ {
+ 	// This is a blocking version of startCommand().
+ 	const bool nonblocking = false;
+-	StartCommandResult rc = startCommand(cmd,sock,timeout,errstack,NULL,NULL,nonblocking,cmd_description,_version,&_sec_man,raw_protocol,sec_session_id);
++	StartCommandResult rc = startCommand(cmd,sock,timeout,errstack,NULL,NULL,nonblocking,cmd_description,_version,&_sec_man,raw_protocol,sec_session_id, _full_hostname);
+ 	switch(rc) {
+ 	case StartCommandSucceeded:
+ 		return true;
+@@ -2097,7 +2098,7 @@ Daemon::forceAuthentication( ReliSock* rsock, CondorError* errstack )
+ 		return true;
+ 	}
+ 
+-	return SecMan::authenticate_sock(rsock, CLIENT_PERM, errstack );
++	return SecMan::authenticate_sock(rsock, CLIENT_PERM, errstack, _full_hostname);
+ }
+ 
+ 
+diff --git a/src/condor_daemon_client/daemon.h b/src/condor_daemon_client/daemon.h
+index 57fcd8a..9aa3b9f 100644
+--- a/src/condor_daemon_client/daemon.h
++++ b/src/condor_daemon_client/daemon.h
+@@ -761,7 +761,7 @@ protected:
+ 		   It may be either blocking or nonblocking, depending on the
+ 		   nonblocking flag.  This version uses an existing socket.
+ 		 */
+-	static StartCommandResult startCommand( int cmd, Sock* sock, int timeout, CondorError *errstack, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking, char const *cmd_description, char *version, SecMan *sec_man, bool raw_protocol, char const *sec_session_id );
++	static StartCommandResult startCommand( int cmd, Sock* sock, int timeout, CondorError *errstack, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking, char const *cmd_description, char *version, SecMan *sec_man, bool raw_protocol, char const *sec_session_id, char const *hostname );
+ 
+ 		/**
+ 		   Internal function used by public versions of startCommand().
+@@ -769,7 +769,7 @@ protected:
+ 		   nonblocking flag.  This version creates a socket of the
+ 		   specified type and connects it.
+ 		 */
+-	StartCommandResult startCommand( int cmd, Stream::stream_type st,Sock **sock,int timeout, CondorError *errstack, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking, char const *cmd_description=NULL, bool raw_protocol=false, char const *sec_session_id=NULL );
++	StartCommandResult startCommand( int cmd, Stream::stream_type st,Sock **sock,int timeout, CondorError *errstack, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking, char const *cmd_description, bool raw_protocol, char const *sec_session_id );
+ 
+ 		/**
+ 		   Class used internally to handle non-blocking connects for
+diff --git a/src/condor_daemon_client/daemon_list.cpp b/src/condor_daemon_client/daemon_list.cpp
+index 244d58a..597d981 100644
+--- a/src/condor_daemon_client/daemon_list.cpp
++++ b/src/condor_daemon_client/daemon_list.cpp
+@@ -330,7 +330,7 @@ CollectorList::query(CondorQuery & cQuery, ClassAdList & adList, CondorError *er
+                     }
+ 
+                     result = 
+-                            cQuery.fetchAds (adList, daemon->addr(), errstack);
++                            cQuery.fetchAds (adList, *daemon, errstack);
+ 
+                     if( num_collectors > 1 ) {
+                             daemon->blacklistMonitorQueryFinished( result == Q_OK );
+diff --git a/src/condor_daemon_client/dc_schedd.cpp b/src/condor_daemon_client/dc_schedd.cpp
+index af1049e..769e12c 100644
+--- a/src/condor_daemon_client/dc_schedd.cpp
++++ b/src/condor_daemon_client/dc_schedd.cpp
+@@ -41,6 +41,9 @@ DCSchedd::DCSchedd( const char* the_name, const char* the_pool )
+ {
+ }
+ 
++DCSchedd::DCSchedd( const ClassAd* ad, const char* pool )
++	: Daemon( ad, DT_SCHEDD ,pool ) // Surprise!  DT_SCHEDD is the second argument.
++{}
+ 
+ DCSchedd::~DCSchedd( void )
+ {
+diff --git a/src/condor_daemon_client/dc_schedd.h b/src/condor_daemon_client/dc_schedd.h
+index 201c9b4..6389e09 100644
+--- a/src/condor_daemon_client/dc_schedd.h
++++ b/src/condor_daemon_client/dc_schedd.h
+@@ -62,6 +62,13 @@ public:
+ 		*/
+ 	DCSchedd( const char* const name = NULL, const char* pool = NULL );
+ 
++        /** Constructor.  Same as a Daemon object.
++          @param ad   The classad of the schedd object; saves a query 
++                      to the collector.
++          @param pool The name of the pool, NULL if you want local
++        */
++    DCSchedd( const ClassAd* ad, const char* pool = NULL );
++
+ 		/// Destructor
+ 	~DCSchedd();
+ 
+diff --git a/src/condor_daemon_client/dc_startd.cpp b/src/condor_daemon_client/dc_startd.cpp
+index ec3ab14..9a4b44c 100644
+--- a/src/condor_daemon_client/dc_startd.cpp
++++ b/src/condor_daemon_client/dc_startd.cpp
+@@ -914,7 +914,6 @@ DCStartd::getAds( ClassAdList &adsList )
+ 	// fetch the query
+ 	QueryResult q;
+ 	CondorQuery* query;
+-	char* ad_addr;
+ 
+ 	// instantiate query object
+ 	if (!(query = new CondorQuery (STARTD_AD))) {
+@@ -923,8 +922,7 @@ DCStartd::getAds( ClassAdList &adsList )
+ 	}
+ 
+ 	if( this->locate() ){
+-		ad_addr = this->addr();
+-		q = query->fetchAds(adsList, ad_addr, &errstack);
++		q = query->fetchAds(adsList, *this, &errstack);
+ 		if (q != Q_OK) {
+         	if (q == Q_COMMUNICATION_ERROR) {
+             	dprintf( D_ALWAYS, "%s\n", errstack.getFullText(true) );
+diff --git a/src/condor_daemon_core.V6/daemon_command.cpp b/src/condor_daemon_core.V6/daemon_command.cpp
+index e6da114..3a96315 100644
+--- a/src/condor_daemon_core.V6/daemon_command.cpp
++++ b/src/condor_daemon_core.V6/daemon_command.cpp
+@@ -991,7 +991,7 @@ DaemonCommandProtocol::CommandProtocolResult DaemonCommandProtocol::Authenticate
+ 	int auth_timeout = daemonCore->getSecMan()->getSecTimeout( m_comTable[cmd_index].perm );
+ 
+ 	char *method_used = NULL;
+-	bool auth_success = m_sock->authenticate(m_key, auth_methods, &errstack, auth_timeout, &method_used);
++	bool auth_success = m_sock->authenticate(m_key, auth_methods, &errstack, auth_timeout, &method_used, NULL);
+ 
+ 	if ( method_used ) {
+ 		m_policy->Assign(ATTR_SEC_AUTHENTICATION_METHODS, method_used);
+@@ -1279,7 +1279,7 @@ DaemonCommandProtocol::CommandProtocolResult DaemonCommandProtocol::ExecCommand(
+ 			m_comTable[cmd_index].force_authentication &&
+ 			!m_sock->triedAuthentication() )
+ 		{
+-			SecMan::authenticate_sock(m_sock, WRITE, &errstack);
++			SecMan::authenticate_sock(m_sock, WRITE, &errstack, NULL);
+ 				// we don't check the return value, because the code below
+ 				// handles what to do with unauthenticated connections
+ 		}
+diff --git a/src/condor_eventd.V2/admin_event.cpp b/src/condor_eventd.V2/admin_event.cpp
+index 3fa1c46..83abc49 100644
+--- a/src/condor_eventd.V2/admin_event.cpp
++++ b/src/condor_eventd.V2/admin_event.cpp
+@@ -1089,7 +1089,7 @@ AdminEvent::FetchAds_ByConstraint( const char *constraint )
+ 
+ 	query->addORConstraint( constraint );
+ 
+-	q = query->fetchAds( m_collector_query_ads, pool->addr(), &errstack);
++	q = query->fetchAds( m_collector_query_ads, pool, &errstack);
+ 
+ 	if( q != Q_OK ){
+ 		dprintf(D_ALWAYS, "Trouble fetching Ads with<<%s>><<%d>>\n",
+diff --git a/src/condor_gridmanager/gridmanager.cpp b/src/condor_gridmanager/gridmanager.cpp
+index 1f97ef7..03db810 100644
+--- a/src/condor_gridmanager/gridmanager.cpp
++++ b/src/condor_gridmanager/gridmanager.cpp
+@@ -644,7 +644,7 @@ doContactSchedd()
+ 	}
+ 
+ 
+-	schedd = ConnectQ( ScheddAddr, QMGMT_TIMEOUT, false, NULL, myUserName, CondorVersion() );
++	schedd = ConnectQ( *ScheddObj, QMGMT_TIMEOUT, false, NULL, myUserName, CondorVersion() );
+ 	if ( !schedd ) {
+ 		error_str = "Failed to connect to schedd!";
+ 		goto contact_schedd_failure;
+diff --git a/src/condor_includes/authentication.h b/src/condor_includes/authentication.h
+index d2b976a..6167e84 100644
+--- a/src/condor_includes/authentication.h
++++ b/src/condor_includes/authentication.h
+@@ -40,7 +40,7 @@ class Authentication {
+     
+     ~Authentication();
+     
+-    int authenticate( char *hostAddr, const char* auth_methods, CondorError* errstack, int timeout);
++    int authenticate( const char *hostAddr, const char* auth_methods, CondorError* errstack, int timeout);
+     //------------------------------------------
+     // PURPOSE: authenticate with the other side 
+     // REQUIRE: hostAddr     -- host to authenticate
+@@ -50,7 +50,7 @@ class Authentication {
+     // RETURNS: -1 -- failure
+     //------------------------------------------
+ 
+-    int authenticate( char *hostAddr, KeyInfo *& key, const char* auth_methods, CondorError* errstack, int timeout);
++    int authenticate( const char *hostAddr, KeyInfo *& key, const char* auth_methods, CondorError* errstack, int timeout);
+     //------------------------------------------
+     // PURPOSE: To send the secret key over. this method
+     //          is written to keep compatibility issues
+@@ -161,7 +161,7 @@ class Authentication {
+ 
+ #endif /* !SKIP_AUTHENTICATION */
+     
+-    int authenticate_inner( char *hostAddr, const char* auth_methods, CondorError* errstack, int timeout);
++    int authenticate_inner( const char *hostAddr, const char* auth_methods, CondorError* errstack, int timeout);
+     
+     //------------------------------------------
+     // Data (private)
+diff --git a/src/condor_includes/condor_auth_x509.h b/src/condor_includes/condor_auth_x509.h
+index bdbc545..dac8aa5 100644
+--- a/src/condor_includes/condor_auth_x509.h
++++ b/src/condor_includes/condor_auth_x509.h
+@@ -103,7 +103,7 @@ class Condor_Auth_X509 : public Condor_Auth_Base {
+ 
+     int authenticate_self_gss(CondorError* errstack);
+ 
+-    int authenticate_client_gss(CondorError* errstack);
++    int authenticate_client_gss(const char *remoteHost, CondorError* errstack);
+ 
+     int authenticate_server_gss(CondorError* errstack);
+ 
+diff --git a/src/condor_includes/condor_qmgr.h b/src/condor_includes/condor_qmgr.h
+index 5e5012e..642b602 100644
+--- a/src/condor_includes/condor_qmgr.h
++++ b/src/condor_includes/condor_qmgr.h
+@@ -25,7 +25,7 @@
+ #include "proc.h"
+ #include "../condor_utils/CondorError.h"
+ #include "condor_classad.h"
+-
++#include "daemon.h"
+ 
+ typedef struct {
+ 	bool dummy;
+@@ -54,8 +54,7 @@ int InitializeConnection(const char *, const char *);
+ int InitializeReadOnlyConnection(const char * );
+ 
+ /** Initiate connection to schedd job queue and begin transaction.
+-	@param qmgr_location can be the name or sinful string of a schedd or
+-	       NULL to connect to the local schedd
++	@param daemon  a daemon object of type DT_SCHEDD
+     @param timeout specifies the maximum time (in seconds) to wait for TCP
+ 	       connection establishment
+     @param read_only can be set to true to skip the potentially slow
+@@ -64,7 +63,7 @@ int InitializeReadOnlyConnection(const char * );
+ 	@param schedd_version_str Version of schedd if known (o.w. NULL).
+ 	@return opaque Qmgr_connection structure
+ */		 
+-Qmgr_connection *ConnectQ(const char *qmgr_location, int timeout=0, 
++Qmgr_connection *ConnectQ(Daemon &daemon, int timeout=0, 
+ 				bool read_only=false, CondorError* errstack=NULL,
+ 				const char *effective_owner=NULL,
+ 				char const *schedd_version_str=NULL);
+diff --git a/src/condor_includes/condor_secman.h b/src/condor_includes/condor_secman.h
+index b59519e..9891497 100644
+--- a/src/condor_includes/condor_secman.h
++++ b/src/condor_includes/condor_secman.h
+@@ -106,12 +106,12 @@ public:
+ 		// spawn off a non-blocking attempt to create a security
+ 		// session so that in the future, a UDP command could succeed
+ 		// without StartCommandWouldBlock.
+-	StartCommandResult startCommand( int cmd, Sock* sock, bool raw_protocol, CondorError* errstack, int subcmd, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking,char const *cmd_description,char const *sec_session_id);
++	StartCommandResult startCommand( int cmd, Sock* sock, bool raw_protocol, CondorError* errstack, int subcmd, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking,char const *cmd_description,char const *sec_session_id, const char *hostname);
+ 
+ 		// Authenticate a socket using whatever authentication methods
+ 		// have been configured for the specified perm level.
+-	static int authenticate_sock(Sock *s,DCpermission perm, CondorError* errstack);
+-	static int authenticate_sock(Sock *s,KeyInfo *&ki, DCpermission perm, CondorError* errstack);
++	static int authenticate_sock(Sock *s,DCpermission perm, CondorError* errstack, const char * hostname);
++	static int authenticate_sock(Sock *s,KeyInfo *&ki, DCpermission perm, CondorError* errstack, const char * hostname);
+ 
+ 
+     //------------------------------------------
+diff --git a/src/condor_includes/reli_sock.h b/src/condor_includes/reli_sock.h
+index b48ce8d..f5cdca8 100644
+--- a/src/condor_includes/reli_sock.h
++++ b/src/condor_includes/reli_sock.h
+@@ -218,9 +218,9 @@ public:
+ 	virtual int peek(char &);
+ 
+     ///
+-	int authenticate( const char* methods, CondorError* errstack, int auth_timeout );
++	int authenticate( const char* methods, CondorError* errstack, int auth_timeout, const char * hostname );
+     ///
+-	int authenticate( KeyInfo *& key, const char* methods, CondorError* errstack, int auth_timeout, char **method_used=NULL );
++	int authenticate( KeyInfo *& key, const char* methods, CondorError* errstack, int auth_timeout, char **method_used, const char * hostname );
+     ///
+ 	int isClient() { return is_client; };
+ 
+@@ -254,7 +254,8 @@ protected:
+ 	int prepare_for_nobuffering( stream_coding = stream_unknown);
+ 	int perform_authenticate( bool with_key, KeyInfo *& key, 
+ 							  const char* methods, CondorError* errstack,
+-							  int auth_timeout, char **method_used );
++							  int auth_timeout, char **method_used,
++							  const char* hostname );
+ 
+ 	// This is used internally to recover sanity on the stream after
+ 	// failing to open a file in put_file().
+diff --git a/src/condor_includes/sock.h b/src/condor_includes/sock.h
+index ca1b1c8..53f8b23 100644
+--- a/src/condor_includes/sock.h
++++ b/src/condor_includes/sock.h
+@@ -347,10 +347,10 @@ public:
+ 	bool isAuthenticated() const;
+ 
+     ///
+-	virtual int authenticate(const char * auth_methods, CondorError* errstack, int timeout);
++	virtual int authenticate(const char * auth_methods, CondorError* errstack, int timeout, const char *hostname);
+     ///
+ 	// method_used should be freed by the caller when finished with it
+-	virtual int authenticate(KeyInfo *&ki, const char * auth_methods, CondorError* errstack, int timeout, char **method_used=NULL);
++	virtual int authenticate(KeyInfo *&ki, const char * auth_methods, CondorError* errstack, int timeout, char **method_used, const char *hostname);
+ 
+ 	/// if we are connecting, merges together Stream::get_deadline
+ 	/// and connect_timeout_time()
+diff --git a/src/condor_io/authentication.cpp b/src/condor_io/authentication.cpp
+index 4a11db0..0374857 100644
+--- a/src/condor_io/authentication.cpp
++++ b/src/condor_io/authentication.cpp
+@@ -85,7 +85,7 @@ Authentication::~Authentication()
+ #endif
+ }
+ 
+-int Authentication::authenticate( char *hostAddr, KeyInfo *& key, 
++int Authentication::authenticate( const char *hostAddr, KeyInfo *& key, 
+ 								  const char* auth_methods, CondorError* errstack, int timeout)
+ {
+     int retval = authenticate(hostAddr, auth_methods, errstack, timeout);
+@@ -106,7 +106,7 @@ int Authentication::authenticate( char *hostAddr, KeyInfo *& key,
+     return retval;
+ }
+ 
+-int Authentication::authenticate( char *hostAddr, const char* auth_methods,
++int Authentication::authenticate( const char *hostAddr, const char* auth_methods,
+ 		CondorError* errstack, int timeout)
+ {
+ 	int retval;
+@@ -124,7 +124,7 @@ int Authentication::authenticate( char *hostAddr, const char* auth_methods,
+ 	return retval;
+ }
+ 
+-int Authentication::authenticate_inner( char *hostAddr, const char* auth_methods,
++int Authentication::authenticate_inner( const char *hostAddr, const char* auth_methods,
+ 		CondorError* errstack, int timeout)
+ {
+ #if defined(SKIP_AUTHENTICATION)
+diff --git a/src/condor_io/condor_auth_x509.cpp b/src/condor_io/condor_auth_x509.cpp
+index ee80b9d..7c81cea 100644
+--- a/src/condor_io/condor_auth_x509.cpp
++++ b/src/condor_io/condor_auth_x509.cpp
+@@ -92,7 +92,7 @@ Condor_Auth_X509 ::  ~Condor_Auth_X509()
+ 	}
+ }
+ 
+-int Condor_Auth_X509 :: authenticate(const char * /* remoteHost */, CondorError* errstack)
++int Condor_Auth_X509 :: authenticate(const char * remoteHost, CondorError* errstack)
+ {
+     int status = 1;
+     int reply = 0;
+@@ -171,7 +171,7 @@ int Condor_Auth_X509 :: authenticate(const char * /* remoteHost */, CondorError*
+         
+         switch ( mySock_->isClient() ) {
+         case 1: 
+-            status = authenticate_client_gss(errstack);
++            status = authenticate_client_gss(remoteHost, errstack);
+             break;
+         default: 
+             status = authenticate_server_gss(errstack);
+@@ -655,7 +655,7 @@ int Condor_Auth_X509::authenticate_self_gss(CondorError* errstack)
+     return TRUE;
+ }
+ 
+-int Condor_Auth_X509::authenticate_client_gss(CondorError* errstack)
++int Condor_Auth_X509::authenticate_client_gss(const char * remoteHost, CondorError* errstack)
+ {
+     OM_uint32	major_status = 0;
+     OM_uint32	minor_status = 0;
+@@ -775,31 +775,48 @@ int Condor_Auth_X509::authenticate_client_gss(CondorError* errstack)
+ 			}
+ 		}
+ 
+-        std::string fqh = get_full_hostname(mySock_->peer_addr());
+-        StringList * daemonNames = getDaemonList("GSI_DAEMON_NAME",fqh.c_str());
+-
+-        // Now, let's see if the name is in the list, I am not using
+-        // anycase here, so if the host name and what we are looking for
+-        // are in different cases, then we will run into problems.
+-		if( daemonNames ) {
+-			status = daemonNames->contains_withwildcard(server) == TRUE? 1 : 0;
+-
+-			if( !status ) {
+-				errstack->pushf("GSI", GSI_ERR_UNAUTHORIZED_SERVER,
+-								"Failed to authenticate because the subject '%s' is not currently trusted by you.  "
+-								"If it should be, add it to GSI_DAEMON_NAME or undefine GSI_DAEMON_NAME.", server);
+-				dprintf(D_SECURITY,
+-						"GSI_DAEMON_NAME is defined and the server %s is not specified in the GSI_DAEMON_NAME parameter\n",
+-						server);
+-			}
++		std::vector<MyString> fqhs;
++		if (remoteHost)
++		{
++			std::vector<MyString> fqhs_copy = get_hostname_with_alias(mySock_->peer_addr());
++			fqhs.push_back(remoteHost);
++			fqhs.insert(fqhs.begin()+1, fqhs_copy.begin(), fqhs_copy.end());
+ 		}
+-		else {
+-			status = CheckServerName(fqh.c_str(),mySock_->peer_ip_str(),mySock_,errstack);
++		else
++		{
++			fqhs = get_hostname_with_alias(mySock_->peer_addr());
+ 		}
++        dprintf(D_FULLDEBUG, "Number of aliases: %zu\n", fqhs.size());
++		for(std::vector<MyString>::const_iterator it = fqhs.begin(); it != fqhs.end(); ++it) {
++			dprintf(D_FULLDEBUG, "Checking validity of alias %s\n", it->Value());
++			std::string fqh = it->Value();
++			StringList * daemonNames = getDaemonList("GSI_DAEMON_NAME",fqh.c_str());
++		
++			// Now, let's see if the name is in the list, I am not using
++			// anycase here, so if the host name and what we are looking for
++			// are in different cases, then we will run into problems.
++			if( daemonNames ) {
++				status = daemonNames->contains_withwildcard(server) == TRUE? 1 : 0;
++
++				if( !status ) {
++					errstack->pushf("GSI", GSI_ERR_UNAUTHORIZED_SERVER,
++									"Failed to authenticate because the subject '%s' is not currently trusted by you.  "
++									"If it should be, add it to GSI_DAEMON_NAME or undefine GSI_DAEMON_NAME.", server);
++					dprintf(D_SECURITY,
++							"GSI_DAEMON_NAME is defined and the server %s is not specified in the GSI_DAEMON_NAME parameter\n",
++							server);
++				}
++			}
++			else {
++				status = CheckServerName(fqh.c_str(),mySock_->peer_ip_str(),mySock_,errstack);
++			}
++        	delete daemonNames;
+ 
+-        if (status) {
+-            dprintf(D_SECURITY, "valid GSS connection established to %s\n", server);            
+-        }
++	        if (status) {
++	            dprintf(D_SECURITY, "valid GSS connection established to %s\n", server);
++				break;
++	        }
++		}
+ 
+         mySock_->encode();
+         if (!mySock_->code(status) || !mySock_->end_of_message()) {
+@@ -810,7 +827,6 @@ int Condor_Auth_X509::authenticate_client_gss(CondorError* errstack)
+         }
+ 
+         delete [] server;
+-        delete daemonNames;
+     }
+  clear:
+     return (status == 0) ? FALSE : TRUE;
+diff --git a/src/condor_io/condor_secman.cpp b/src/condor_io/condor_secman.cpp
+index 21607fe..ea768bf 100644
+--- a/src/condor_io/condor_secman.cpp
++++ b/src/condor_io/condor_secman.cpp
+@@ -855,7 +855,7 @@ class SecManStartCommand: Service, public ClassyCountedPtr {
+ 	SecManStartCommand (
+ 		int cmd,Sock *sock,bool raw_protocol,
+ 		CondorError *errstack,int subcmd,StartCommandCallbackType *callback_fn,
+-		void *misc_data,bool nonblocking,char const *cmd_description,char const *sec_session_id_hint,SecMan *sec_man):
++		void *misc_data,bool nonblocking,char const *cmd_description,char const *sec_session_id_hint,SecMan *sec_man, const std::string &hostname):
+ 
+ 		m_cmd(cmd),
+ 		m_subcmd(subcmd),
+@@ -867,7 +867,8 @@ class SecManStartCommand: Service, public ClassyCountedPtr {
+ 		m_nonblocking(nonblocking),
+ 		m_pending_socket_registered(false),
+ 		m_sec_man(*sec_man),
+-		m_use_tmp_sec_session(false)
++		m_use_tmp_sec_session(false),
++		m_hostname(hostname)
+ 	{
+ 		m_sec_session_id_hint = sec_session_id_hint ? sec_session_id_hint : "";
+ 		if( m_sec_session_id_hint == USE_TMP_SEC_SESSION ) {
+@@ -972,6 +973,7 @@ class SecManStartCommand: Service, public ClassyCountedPtr {
+ 	KeyCacheEntry *m_enc_key;
+ 	KeyInfo* m_private_key;
+ 	MyString m_sec_session_id_hint;
++	std::string m_hostname;
+ 
+ 	enum StartCommandState {
+ 		SendAuthInfo,
+@@ -1023,7 +1025,7 @@ class SecManStartCommand: Service, public ClassyCountedPtr {
+ };
+ 
+ StartCommandResult
+-SecMan::startCommand( int cmd, Sock* sock, bool raw_protocol, CondorError* errstack, int subcmd, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking,char const *cmd_description,char const *sec_session_id_hint)
++SecMan::startCommand( int cmd, Sock* sock, bool raw_protocol, CondorError* errstack, int subcmd, StartCommandCallbackType *callback_fn, void *misc_data, bool nonblocking,char const *cmd_description,char const *sec_session_id_hint, const char *hostname)
+ {
+ 	// This function is simply a convenient wrapper around the
+ 	// SecManStartCommand class, which does the actual work.
+@@ -1032,7 +1034,8 @@ SecMan::startCommand( int cmd, Sock* sock, bool raw_protocol, CondorError* errst
+ 	// The blocking case could avoid use of the heap, but for simplicity,
+ 	// we just do the same in both cases.
+ 
+-	classy_counted_ptr<SecManStartCommand> sc = new SecManStartCommand(cmd,sock,raw_protocol,errstack,subcmd,callback_fn,misc_data,nonblocking,cmd_description,sec_session_id_hint,this);
++	std::string hostname_str = hostname ? hostname : "";
++	classy_counted_ptr<SecManStartCommand> sc = new SecManStartCommand(cmd,sock,raw_protocol,errstack,subcmd,callback_fn,misc_data,nonblocking,cmd_description,sec_session_id_hint,this, hostname_str);
+ 
+ 	ASSERT(sc.get());
+ 
+@@ -1829,7 +1832,7 @@ SecManStartCommand::authenticate_inner()
+ 			}
+ 
+ 			int auth_timeout = m_sec_man.getSecTimeout( CLIENT_PERM );
+-			bool auth_success = m_sock->authenticate(m_private_key, auth_methods, m_errstack,auth_timeout);
++			bool auth_success = m_sock->authenticate(m_private_key, auth_methods, m_errstack,auth_timeout, NULL, m_hostname.c_str());
+ 
+ 			if (auth_methods) {  
+ 				free(auth_methods);
+@@ -2159,7 +2162,8 @@ SecManStartCommand::DoTCPAuth_inner()
+ 		m_nonblocking,
+ 		m_cmd_description.Value(),
+ 		m_sec_session_id_hint.Value(),
+-		&m_sec_man);
++		&m_sec_man,
++		m_hostname);
+ 
+ 	StartCommandResult auth_result = m_tcp_auth_command->startCommand();
+ 
+@@ -2796,23 +2800,23 @@ char* SecMan::my_parent_unique_id() {
+ }
+ 
+ int
+-SecMan::authenticate_sock(Sock *s,DCpermission perm, CondorError* errstack)
++SecMan::authenticate_sock(Sock *s,DCpermission perm, CondorError* errstack, const char * hostname)
+ {
+ 	MyString methods;
+ 	getAuthenticationMethods( perm, &methods );
+ 	ASSERT(s);
+ 	int auth_timeout = getSecTimeout(perm);
+-	return s->authenticate(methods.Value(),errstack,auth_timeout);
++	return s->authenticate(methods.Value(),errstack,auth_timeout, hostname);
+ }
+ 
+ int
+-SecMan::authenticate_sock(Sock *s,KeyInfo *&ki, DCpermission perm, CondorError* errstack)
++SecMan::authenticate_sock(Sock *s,KeyInfo *&ki, DCpermission perm, CondorError* errstack, const char * hostname)
+ {
+ 	MyString methods;
+ 	getAuthenticationMethods( perm, &methods );
+ 	ASSERT(s);
+ 	int auth_timeout = getSecTimeout(perm);
+-	return s->authenticate(ki,methods.Value(),errstack,auth_timeout);
++	return s->authenticate(ki,methods.Value(),errstack,auth_timeout, NULL, hostname);
+ }
+ 
+ int
+diff --git a/src/condor_io/reli_sock.cpp b/src/condor_io/reli_sock.cpp
+index d80bab4..00a6d10 100644
+--- a/src/condor_io/reli_sock.cpp
++++ b/src/condor_io/reli_sock.cpp
+@@ -967,11 +967,11 @@ ReliSock::prepare_for_nobuffering(stream_coding direction)
+ 
+ int ReliSock::perform_authenticate(bool with_key, KeyInfo *& key, 
+ 								   const char* methods, CondorError* errstack,
+-								   int auth_timeout, char **method_used)
++								   int auth_timeout, char **method_used,
++								   const char * hostname )
+ {
+ 	int in_encode_mode;
+ 	int result;
+-
+ 	if( method_used ) {
+ 		*method_used = NULL;
+ 	}
+@@ -984,9 +984,9 @@ int ReliSock::perform_authenticate(bool with_key, KeyInfo *& key,
+ 
+ 			// actually perform the authentication
+ 		if ( with_key ) {
+-			result = authob.authenticate( hostAddr, key, methods, errstack, auth_timeout );
++			result = authob.authenticate( hostname, key, methods, errstack, auth_timeout );
+ 		} else {
+-			result = authob.authenticate( hostAddr, methods, errstack, auth_timeout );
++			result = authob.authenticate( hostname, methods, errstack, auth_timeout );
+ 		}
+ 			// restore stream mode (either encode or decode)
+ 		if ( in_encode_mode && is_decode() ) {
+@@ -1010,16 +1010,16 @@ int ReliSock::perform_authenticate(bool with_key, KeyInfo *& key,
+     }
+ }
+ 
+-int ReliSock::authenticate(KeyInfo *& key, const char* methods, CondorError* errstack, int auth_timeout, char **method_used)
++int ReliSock::authenticate(KeyInfo *& key, const char* methods, CondorError* errstack, int auth_timeout, char **method_used, const char *hostname)
+ {
+-	return perform_authenticate(true,key,methods,errstack,auth_timeout,method_used);
++	return perform_authenticate(true,key,methods,errstack,auth_timeout,method_used, hostname);
+ }
+ 
+ int 
+-ReliSock::authenticate(const char* methods, CondorError* errstack,int auth_timeout ) 
++ReliSock::authenticate(const char* methods, CondorError* errstack,int auth_timeout, const char * hostname) 
+ {
+ 	KeyInfo *key = NULL;
+-	return perform_authenticate(false,key,methods,errstack,auth_timeout,NULL);
++	return perform_authenticate(false,key,methods,errstack,auth_timeout,NULL, hostname);
+ }
+ 
+ bool
+diff --git a/src/condor_io/sock.cpp b/src/condor_io/sock.cpp
+index c4dcb0b..e743139 100644
+--- a/src/condor_io/sock.cpp
++++ b/src/condor_io/sock.cpp
+@@ -2235,12 +2235,12 @@ bool Sock :: is_hdr_encrypt(){
+ 	return FALSE;
+ }
+ 
+-int Sock :: authenticate(KeyInfo *&, const char * /* methods */, CondorError* /* errstack */, int /*timeout*/, char ** /*method_used*/)
++int Sock :: authenticate(KeyInfo *&, const char * /* methods */, CondorError* /* errstack */, int /*timeout*/, char ** /*method_used*/, const char * /*hostname*/)
+ {
+ 	return -1;
+ }
+ 
+-int Sock :: authenticate(const char * /* methods */, CondorError* /* errstack */, int /*timeout*/)
++int Sock :: authenticate(const char * /* methods */, CondorError* /* errstack */, int /*timeout*/, const char * /*hostname*/)
+ {
+ 	/*
+ 	errstack->push("AUTHENTICATE", AUTHENTICATE_ERR_NOT_BUILT,
+diff --git a/src/condor_job_router/submit_job.cpp b/src/condor_job_router/submit_job.cpp
+index ccad171..393bafc 100644
+--- a/src/condor_job_router/submit_job.cpp
++++ b/src/condor_job_router/submit_job.cpp
+@@ -175,7 +175,7 @@ ClaimJobResult claim_job(int cluster, int proc, MyString * error_details, const
+ static Qmgr_connection *open_q_as_owner(char const *effective_owner,DCSchedd &schedd,FailObj &failobj)
+ {
+ 	CondorError errstack;
+-	Qmgr_connection * qmgr = ConnectQ(schedd.addr(), 0 /*timeout==default*/, false /*read-only*/, & errstack, effective_owner, schedd.version());
++	Qmgr_connection * qmgr = ConnectQ(schedd, 0 /*timeout==default*/, false /*read-only*/, & errstack, effective_owner, schedd.version());
+ 	if( ! qmgr ) {
+ 		failobj.fail("Unable to connect\n%s\n", errstack.getFullText(true));
+ 		return NULL;
+diff --git a/src/condor_prio/prio.cpp b/src/condor_prio/prio.cpp
+index deec9b1..c27aa94 100644
+--- a/src/condor_prio/prio.cpp
++++ b/src/condor_prio/prio.cpp
+@@ -157,8 +157,7 @@ main( int argc, char *argv[] )
+ 	}
+ 
+ 	// Open job queue
+-	DaemonName = schedd.addr();
+-	q = ConnectQ(DaemonName.Value());
++	q = ConnectQ(schedd);
+ 	if( !q ) {
+ 		fprintf( stderr, "Failed to connect to queue manager %s\n", 
+ 				 DaemonName.Value() );
+diff --git a/src/condor_q.V6/queue.cpp b/src/condor_q.V6/queue.cpp
+index 58ff6ed..85ad9cf 100644
+--- a/src/condor_q.V6/queue.cpp
++++ b/src/condor_q.V6/queue.cpp
+@@ -119,13 +119,13 @@ static 	char * bufferJobShort (ClassAd *);
+ /* if useDB is false, then v1 =scheddAddress, v2=scheddName, v3=scheddMachine, v4=scheddVersion;
+    if useDB is true,  then v1 =quill_name,  v2=db_ipAddr,   v3=db_name, v4=db_password
+ */
+-static	bool show_queue (const char* v1, const char* v2, const char* v3, const char* v4, bool useDB);
+-static	bool show_queue_buffered (const char* v1, const char* v2, const char* v3, const char* v4, bool useDB);
++static	bool show_queue (const char* v1, const char* v2, const char* v3, const char* v4, const ClassAd *ad, bool useDB);
++static	bool show_queue_buffered (const char* v1, const char* v2, const char* v3, const char* v4, const ClassAd *ad, bool useDB);
+ static void init_output_mask();
+ 
+ 
+ /* a type used to point to one of the above two functions */
+-typedef bool (*show_queue_fp)(const char* v1, const char* v2, const char* v3, const char* v4, bool useDB);
++typedef bool (*show_queue_fp)(const char* v1, const char* v2, const char* v3, const char* v4, const ClassAd *ad, bool useDB);
+ 
+ static bool read_classad_file(const char *filename, ClassAdList &classads);
+ 
+@@ -506,7 +506,7 @@ int main (int argc, char **argv)
+ 
+ 						/* ask the database for the queue */
+ 
+-						if ( (retval = sqfp( NULL, NULL, NULL, NULL, TRUE) ) ) {
++						if ( (retval = sqfp( NULL, NULL, NULL, NULL, NULL, TRUE) ) ) {
+ 							/* if the queue was retrieved, then I am done */
+ 							freeConnectionStrings();
+ 							exit(retval?EXIT_SUCCESS:EXIT_FAILURE);
+@@ -557,7 +557,7 @@ int main (int argc, char **argv)
+ 									(quill.name()):tmp_char,
+ 						  		(quill.fullHostname())?
+ 									(quill.fullHostname()):tmp_char,
+-						  		NULL, FALSE) ) ) )
++						  		NULL, NULL, FALSE) ) ) )
+ 						{
+ 							/* if the queue was retrieved, then I am done */
+ 							freeConnectionStrings();
+@@ -600,7 +600,7 @@ int main (int argc, char **argv)
+ #endif /* HAVE_EXT_POSTGRESQL */
+ 				case DIRECT_SCHEDD:
+ 					retval = sqfp(scheddAddr, scheddName, scheddMachine, 
+-								  scheddVersion.Value(), FALSE);
++								  scheddVersion.Value(), NULL, FALSE);
+ 			
+ 					/* Hopefully I got the queue from the schedd... */
+ 					freeConnectionStrings();
+@@ -793,7 +793,7 @@ int main (int argc, char **argv)
+ 			case DIRECT_RDBMS:
+ 				if (useDB) {
+ 					if ( (retval = sqfp(quillName, dbIpAddr, dbName, 
+-										queryPassword, TRUE) ) )
++										queryPassword, ad, TRUE) ) )
+ 					{
+ 						/* processed correctly, so do the next ad */
+ 						continue;
+@@ -840,7 +840,7 @@ int main (int argc, char **argv)
+ 
+ 					if((result2 == Q_OK) && quillAddr &&
+ 			   			(retval = sqfp(quillAddr, quillName, quillMachine, 
+-									   NULL, FALSE) ) )
++									   NULL, ad, FALSE) ) )
+ 					{
+ 						/* processed correctly, so do the next ad */
+ 						continue;
+@@ -896,7 +896,7 @@ int main (int argc, char **argv)
+ 			case DIRECT_SCHEDD:
+ 				/* database not configured or could not be reached,
+ 					query the schedd daemon directly */
+-				retval = sqfp(scheddAddr, scheddName, scheddMachine, scheddVersion.Value(), FALSE);
++				retval = sqfp(scheddAddr, scheddName, scheddMachine, scheddVersion.Value(), ad, FALSE);
+ 
+ 				break;
+ 
+@@ -2536,7 +2536,7 @@ static void init_output_mask()
+ */
+ 
+ static bool
+-show_queue_buffered( const char* v1, const char* v2, const char* v3, const char* v4, bool useDB )
++show_queue_buffered( const char* v1, const char* v2, const char* v3, const char* v4, const ClassAd* ad, bool useDB )
+ {
+ 	const char *scheddAddress = 0;
+ 	const char *scheddName = 0;
+@@ -2709,7 +2709,13 @@ show_queue_buffered( const char* v1, const char* v2, const char* v3, const char*
+ #endif /* HAVE_EXT_POSTGRESQL */
+ 	} else {
+ 			// fetch queue from schedd and stash it in output_buffer.
+-		Daemon schedd(DT_SCHEDD, scheddName, pool ? pool->addr() : NULL );
++		Daemon *schedd_ptr = NULL;
++		if (ad)
++			schedd_ptr = new Daemon(ad, DT_SCHEDD, pool ? pool->addr() : NULL );
++		else
++			schedd_ptr = new Daemon(DT_SCHEDD, scheddName, pool ? pool->addr() : NULL );
++		ASSERT(schedd_ptr);
++		Daemon & schedd = *schedd_ptr;
+ 		const char *version = schedd.version();
+ 		bool useFastPath = false;
+ 		if (version) {
+@@ -2719,9 +2725,12 @@ show_queue_buffered( const char* v1, const char* v2, const char* v3, const char*
+ 
+ 			// stash the schedd daemon object for use by process_buffer_line
+ 		g_cur_schedd_for_process_buffer_line = new Daemon( schedd );
++		ASSERT( g_cur_schedd_for_process_buffer_line );
++
++		delete schedd_ptr;
+ 
+ 		int fetchResult;
+-		if( (fetchResult = Q.fetchQueueFromHostAndProcess( scheddAddress, attrs,
++		if( (fetchResult = Q.fetchQueueFromDaemonAndProcess( *g_cur_schedd_for_process_buffer_line, attrs,
+ 											process_buffer_line,
+ 											useFastPath,
+ 											&errstack)) != Q_OK) {
+@@ -2967,7 +2976,7 @@ process_buffer_line( ClassAd *job )
+    refer to the prototype of this function on the top of this file 
+ */
+ static bool
+-show_queue( const char* v1, const char* v2, const char* v3, const char* v4, bool useDB )
++show_queue( const char* v1, const char* v2, const char* v3, const char* v4, const ClassAd * ad, bool useDB )
+ {
+ 	const char *scheddAddress;
+ 	const char *scheddName;
+@@ -3046,7 +3055,13 @@ show_queue( const char* v1, const char* v2, const char* v3, const char* v4, bool
+ 		} else {
+ 				// fetch queue from schedd	
+ 			int fetchResult;
+-			if( (fetchResult = Q.fetchQueueFromHost(jobs, attrs,scheddAddress, scheddVersion, &errstack) != Q_OK)) {
++			Daemon *schedd_daemon_ptr;
++			if (ad)
++				schedd_daemon_ptr = new Daemon(ad, DT_SCHEDD, pool ? pool->addr() : NULL );
++			else
++				schedd_daemon_ptr = new Daemon(DT_SCHEDD, scheddName, pool ? pool->addr() : NULL );
++			Daemon &schedd_daemon = *schedd_daemon_ptr;
++			if( (fetchResult = Q.fetchQueueFromDaemon(jobs, attrs, schedd_daemon, scheddVersion, &errstack) != Q_OK)) {
+ 			// The parse + fetch failed, print out why
+ 			switch(fetchResult) {
+ 				case Q_PARSE_ERROR:
+@@ -3081,7 +3096,12 @@ show_queue( const char* v1, const char* v2, const char* v3, const char* v4, bool
+ 					scheddAddress, scheddMachine);	
+ 		}
+ 
+-		Daemon schedd_daemon(DT_SCHEDD,scheddName,pool ? pool->addr() : NULL);
++		Daemon *schedd_daemon_ptr;
++		if (ad)
++			schedd_daemon_ptr = new Daemon(ad, DT_SCHEDD, pool ? pool->addr() : NULL );
++		else
++			schedd_daemon_ptr = new Daemon(DT_SCHEDD, scheddName, pool ? pool->addr() : NULL );
++		Daemon &schedd_daemon = *schedd_daemon_ptr;
+ 		schedd_daemon.locate();
+ 
+ 		jobs.Open();
+@@ -3089,6 +3109,7 @@ show_queue( const char* v1, const char* v2, const char* v3, const char* v4, bool
+ 			doRunAnalysis( job, &schedd_daemon );
+ 		}
+ 		jobs.Close();
++		delete schedd_daemon_ptr;
+ 
+ 		if(lastUpdate) {
+ 			free(lastUpdate);
+diff --git a/src/condor_schedd.V6/qmgmt_receivers.cpp b/src/condor_schedd.V6/qmgmt_receivers.cpp
+index 98e1960..db6314f 100644
+--- a/src/condor_schedd.V6/qmgmt_receivers.cpp
++++ b/src/condor_schedd.V6/qmgmt_receivers.cpp
+@@ -71,7 +71,7 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
+ 				dprintf(D_SECURITY,"Calling authenticate(%s) in qmgmt_receivers\n", methods.Value());
+ 			}
+ 			CondorError errstack;
+-			if( ! SecMan::authenticate_sock(syscall_sock, WRITE, &errstack) ) {
++			if( ! SecMan::authenticate_sock(syscall_sock, WRITE, &errstack, NULL) ) {
+ 					// Failed to authenticate
+ 				dprintf( D_ALWAYS, "SCHEDD: authentication failed: %s\n", 
+ 						 errstack.getFullText() );
+diff --git a/src/condor_schedd.V6/qmgr_job_updater.cpp b/src/condor_schedd.V6/qmgr_job_updater.cpp
+index f9c100a..25126dd 100644
+--- a/src/condor_schedd.V6/qmgr_job_updater.cpp
++++ b/src/condor_schedd.V6/qmgr_job_updater.cpp
+@@ -47,8 +47,10 @@ QmgrJobUpdater::QmgrJobUpdater( ClassAd* job, const char* schedd_address,
+ 	schedd_addr(schedd_address?strdup(schedd_address):0),
+ 	schedd_ver(schedd_version?strdup(schedd_version):0),
+ 	cluster(-1), proc(-1),
+-	q_update_tid(-1) 
++	q_update_tid(-1),
++	m_daemon(DT_SCHEDD, schedd_address)
+ {
++
+ 	if( ! is_valid_sinful(schedd_address) ) {
+ 		EXCEPT( "schedd_addr not specified with valid address (%s)",
+ 				schedd_address );
+@@ -252,7 +254,7 @@ QmgrJobUpdater::updateAttr( const char *name, const char *expr, bool updateMaste
+ 	if (log) {
+ 		flags = SHOULDLOG;
+ 	}
+-	if( ConnectQ(schedd_addr,SHADOW_QMGMT_TIMEOUT,false,NULL,m_owner.Value(),schedd_ver) ) {
++	if( ConnectQ(m_daemon,SHADOW_QMGMT_TIMEOUT,false,NULL,m_owner.Value(),schedd_ver) ) {
+ 		if( SetAttribute(cluster,p,name,expr,flags) < 0 ) {
+ 			err_msg = "SetAttribute() failed";
+ 			result = FALSE;
+@@ -338,7 +340,7 @@ QmgrJobUpdater::updateJob( update_t type, SetAttributeFlags_t commit_flags )
+ 			 job_queue_attrs->contains_anycase(name)) ) {
+ 
+ 			if( ! is_connected ) {
+-				if( ! ConnectQ(schedd_addr, SHADOW_QMGMT_TIMEOUT, false, NULL, m_owner.Value(),schedd_ver) ) {
++				if( ! ConnectQ(m_daemon, SHADOW_QMGMT_TIMEOUT, false, NULL, m_owner.Value(),schedd_ver) ) {
+ 					return false;
+ 				}
+ 				is_connected = true;
+@@ -351,7 +353,7 @@ QmgrJobUpdater::updateJob( update_t type, SetAttributeFlags_t commit_flags )
+ 	m_pull_attrs->rewind();
+ 	while ( (name = m_pull_attrs->next()) ) {
+ 		if ( !is_connected ) {
+-			if ( !ConnectQ( schedd_addr, SHADOW_QMGMT_TIMEOUT, true, NULL, NULL, schedd_ver ) ) {
++			if ( !ConnectQ( m_daemon, SHADOW_QMGMT_TIMEOUT, true, NULL, NULL, schedd_ver ) ) {
+ 				return false;
+ 			}
+ 			is_connected = true;
+@@ -392,7 +394,7 @@ QmgrJobUpdater::retrieveJobUpdates( void )
+ 	ProcIdToStr(cluster, proc, id_str);
+ 	job_ids.insert(id_str);
+ 
+-	if ( !ConnectQ( schedd_addr, SHADOW_QMGMT_TIMEOUT, false ) ) {
++	if ( !ConnectQ( m_daemon, SHADOW_QMGMT_TIMEOUT, false ) ) {
+ 		return false;
+ 	}
+ 	if ( GetDirtyAttributes( cluster, proc, &updates ) < 0 ) {
+diff --git a/src/condor_schedd.V6/qmgr_job_updater.h b/src/condor_schedd.V6/qmgr_job_updater.h
+index e487688..ad86fe2 100644
+--- a/src/condor_schedd.V6/qmgr_job_updater.h
++++ b/src/condor_schedd.V6/qmgr_job_updater.h
+@@ -47,7 +47,7 @@ class QmgrJobUpdater : public Service
+ {
+ public:
+ 	QmgrJobUpdater( ClassAd* job_a, const char*schedd_address, char const *schedd_version);
+-	QmgrJobUpdater( ) :  common_job_queue_attrs(0),  hold_job_queue_attrs(0), evict_job_queue_attrs(0), remove_job_queue_attrs(0), requeue_job_queue_attrs(0), terminate_job_queue_attrs(0), checkpoint_job_queue_attrs(0), x509_job_queue_attrs(0), m_pull_attrs(0), job_ad(0), schedd_addr(0), schedd_ver(0), cluster(-1), proc(-1), q_update_tid(-1) {}
++	QmgrJobUpdater( ) :  common_job_queue_attrs(0),  hold_job_queue_attrs(0), evict_job_queue_attrs(0), remove_job_queue_attrs(0), requeue_job_queue_attrs(0), terminate_job_queue_attrs(0), checkpoint_job_queue_attrs(0), x509_job_queue_attrs(0), m_pull_attrs(0), job_ad(0), schedd_addr(0), schedd_ver(0), cluster(-1), proc(-1), q_update_tid(-1), m_daemon(DT_SCHEDD, NULL) {}
+ 	virtual ~QmgrJobUpdater();
+ 
+ 	virtual void startUpdateTimer( void );
+@@ -148,6 +148,8 @@ private:
+ 	int proc;
+ 
+ 	int q_update_tid;
++
++	Daemon m_daemon;
+ };	
+ 
+ // usefull if you don't want to update the job queue
+diff --git a/src/condor_schedd.V6/qmgr_lib_support.cpp b/src/condor_schedd.V6/qmgr_lib_support.cpp
+index 64bfffd..4afd1a6 100644
+--- a/src/condor_schedd.V6/qmgr_lib_support.cpp
++++ b/src/condor_schedd.V6/qmgr_lib_support.cpp
+@@ -34,8 +34,9 @@ ReliSock *qmgmt_sock = NULL;
+ static Qmgr_connection connection;
+ 
+ Qmgr_connection *
+-ConnectQ(const char *qmgr_location, int timeout, bool read_only, CondorError* errstack, const char *effective_owner, const char* schedd_version_str )
++ConnectQ(Daemon &d, int timeout, bool read_only, CondorError* errstack, const char *effective_owner, const char* schedd_version_str )
+ {
++
+ 	int		rval, ok;
+ 	int cmd = read_only ? QMGMT_READ_CMD : QMGMT_WRITE_CMD;
+ 
+@@ -54,15 +55,10 @@ ConnectQ(const char *qmgr_location, int timeout, bool read_only, CondorError* er
+ 	}
+ 
+     // no connection active as of now; create a new one
+-	Daemon d( DT_SCHEDD, qmgr_location );
++	dprintf(D_HOSTNAME, "Hostname of new connection: %s\n", d.fullHostname());
+ 	if( ! d.locate() ) {
+ 		ok = FALSE;
+-		if( qmgr_location ) {
+-			dprintf( D_ALWAYS, "Can't find address of queue manager %s\n", 
+-					 qmgr_location );
+-		} else {
+-			dprintf( D_ALWAYS, "Can't find address of local queue manager\n" );
+-		}
++		dprintf( D_ALWAYS, "Can't find address of queue manager\n" );
+ 	} else { 
+ 			// QMGMT_WRITE_CMD didn't exist before 7.5.0, so use QMGMT_READ_CMD
+ 			// when talking to older schedds
+@@ -104,7 +100,7 @@ ConnectQ(const char *qmgr_location, int timeout, bool read_only, CondorError* er
+ 		// the connection, because this command is registered with
+ 		// force_authentication=true on the server side.
+ 	if( cmd == QMGMT_WRITE_CMD && !qmgmt_sock->triedAuthentication()) {
+-		if( !SecMan::authenticate_sock(qmgmt_sock, CLIENT_PERM, errstack_select ) )
++		if( !SecMan::authenticate_sock(qmgmt_sock, CLIENT_PERM, errstack_select, d.fullHostname()) )
+ 		{
+ 			delete qmgmt_sock;
+ 			qmgmt_sock = NULL;
+@@ -155,7 +151,7 @@ ConnectQ(const char *qmgr_location, int timeout, bool read_only, CondorError* er
+         }
+ 
+         if ( !read_only ) {
+-            if (!SecMan::authenticate_sock(qmgmt_sock, CLIENT_PERM, errstack_select)) {
++            if (!SecMan::authenticate_sock(qmgmt_sock, CLIENT_PERM, errstack_select, d.fullHostname())) {
+                 delete qmgmt_sock;
+                 qmgmt_sock = NULL;
+ 				if (!errstack) {
+diff --git a/src/condor_schedd.V6/schedd.cpp b/src/condor_schedd.V6/schedd.cpp
+index b855407..6731e6c 100644
+--- a/src/condor_schedd.V6/schedd.cpp
++++ b/src/condor_schedd.V6/schedd.cpp
+@@ -3434,7 +3434,7 @@ Scheduler::spoolJobFiles(int mode, Stream* s)
+ 
+ 	if( ! rsock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack) ) {
++		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack, NULL) ) {
+ 				// we failed to authenticate, we should bail out now
+ 				// since we don't know what user is trying to perform
+ 				// this action.
+@@ -3690,7 +3690,7 @@ Scheduler::updateGSICred(int cmd, Stream* s)
+ 
+ 	if( ! rsock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack) ) {
++		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack, NULL) ) {
+ 				// we failed to authenticate, we should bail out now
+ 				// since we don't know what user is trying to perform
+ 				// this action.
+@@ -3901,7 +3901,7 @@ Scheduler::actOnJobs(int, Stream* s)
+ 	rsock->decode();
+ 	if( ! rsock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack) ) {
++		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack, NULL) ) {
+ 				// we failed to authenticate, we should bail out now
+ 				// since we don't know what user is trying to perform
+ 				// this action.
+@@ -12104,7 +12104,7 @@ Scheduler::get_job_connect_info_handler_implementation(int, Stream* s) {
+ 		// force authentication
+ 	if( !sock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(sock, WRITE, &errstack) ||
++		if( ! SecMan::authenticate_sock(sock, WRITE, &errstack, NULL) ||
+ 			! sock->getFullyQualifiedUser() )
+ 		{
+ 			dprintf( D_ALWAYS,
+@@ -13145,7 +13145,7 @@ Scheduler::claimLocalStartd()
+ 	CondorQuery query(STARTD_AD);
+ 	QueryResult q;
+ 	ClassAdList result;
+-	q = query.fetchAds(result, startd_addr, &errstack);
++	q = query.fetchAds(result, startd, &errstack);
+ 	if ( q != Q_OK ) {
+ 		dprintf(D_FULLDEBUG,
+ 				"ERROR: could not fetch ads from local startd : %s (%s)\n",
+@@ -13654,7 +13654,7 @@ Scheduler::RecycleShadow(int /*cmd*/, Stream *stream)
+ 	sock->decode();
+ 	if( !sock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(sock, WRITE, &errstack) ||
++		if( ! SecMan::authenticate_sock(sock, WRITE, &errstack, NULL) ||
+ 			! sock->getFullyQualifiedUser() )
+ 		{
+ 			dprintf( D_ALWAYS,
+@@ -13864,7 +13864,7 @@ Scheduler::clear_dirty_job_attrs_handler(int /*cmd*/, Stream *stream)
+ 	sock->decode();
+ 	if( !sock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(sock, WRITE, &errstack) ||
++		if( ! SecMan::authenticate_sock(sock, WRITE, &errstack, NULL) ||
+ 			! sock->getFullyQualifiedUser() )
+ 		{
+ 			dprintf( D_ALWAYS,
+diff --git a/src/condor_schedd.V6/schedd_td.cpp b/src/condor_schedd.V6/schedd_td.cpp
+index 3e30f27..a9b0e4b 100644
+--- a/src/condor_schedd.V6/schedd_td.cpp
++++ b/src/condor_schedd.V6/schedd_td.cpp
+@@ -76,7 +76,7 @@ Scheduler::requestSandboxLocation(int mode, Stream* s)
+ 
+ 	if( ! rsock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack) ) {
++		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack, NULL) ) {
+ 				// we failed to authenticate, we should bail out now
+ 				// since we don't know what user is trying to perform
+ 				// this action.
+diff --git a/src/condor_schedd.V6/tdman.cpp b/src/condor_schedd.V6/tdman.cpp
+index 53c6000..eb1e205 100644
+--- a/src/condor_schedd.V6/tdman.cpp
++++ b/src/condor_schedd.V6/tdman.cpp
+@@ -869,7 +869,7 @@ TDMan::transferd_registration(int cmd, Stream *sock)
+ 	///////////////////////////////////////////////////////////////
+ 	if( ! rsock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack) ) {
++		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack, NULL) ) {
+ 				// we failed to authenticate, we should bail out now
+ 				// since we don't know what user is trying to perform
+ 				// this action.
+diff --git a/src/condor_status.V6/status.cpp b/src/condor_status.V6/status.cpp
+index dea2c92..187e843 100644
+--- a/src/condor_status.V6/status.cpp
++++ b/src/condor_status.V6/status.cpp
+@@ -442,14 +442,19 @@ main (int argc, char *argv[])
+ 	        // subsystem that corresponds to a daemon (above).
+                 // Here 'addr' represents either the host:port of requested pool, or
+                 // alternatively the host:port of daemon associated with requested subsystem (direct mode)
+-		q = query->fetchAds (result, addr, &errstack);
++
++		// If we are querying the same collector as before, reuse that object.
++		// This is important for hostname resolution.
++		if (!direct)
++			q = query->fetchAds (result, *pool, &errstack);
++		else
++			q = query->fetchAds (result, addr, &errstack);
+ 	} else {
+                 // otherwise obtain list of collectors and submit query that way
+ 		CollectorList * collectors = CollectorList::create();
+ 		q = collectors->query (*query, result, &errstack);
+ 		delete collectors;
+ 	}
+-		
+ 
+ 	// if any error was encountered during the query, report it and exit 
+         if (Q_OK != q) {
+diff --git a/src/condor_submit.V6/submit.cpp b/src/condor_submit.V6/submit.cpp
+index 76bbabf..f5e118b 100644
+--- a/src/condor_submit.V6/submit.cpp
++++ b/src/condor_submit.V6/submit.cpp
+@@ -6237,7 +6237,8 @@ connect_to_the_schedd()
+ 	setupAuthentication();
+ 
+ 	CondorError errstack;
+-	if( ConnectQ(MySchedd->addr(), 0 /* default */, false /* default */, &errstack, NULL, MySchedd->version() ) == 0 ) {
++	ASSERT(MySchedd);
++	if( ConnectQ(*MySchedd, 0 /* default */, false /* default */, &errstack, NULL, MySchedd->version() ) == 0 ) {
+ 		if( ScheddName ) {
+ 			fprintf( stderr, 
+ 					"\nERROR: Failed to connect to queue manager %s\n%s\n",
+@@ -7202,7 +7203,8 @@ DoCleanup(int,int,const char*)
+ 		// DoCleanup().  This lead to infinite recursion which is bad.
+ 		ClusterCreated = 0;
+ 		if (!ActiveQueueConnection) {
+-			ActiveQueueConnection = (ConnectQ(MySchedd->addr()) != 0);
++			ASSERT( MySchedd );
++			ActiveQueueConnection = (ConnectQ(*MySchedd) != 0);
+ 		}
+ 		if (ActiveQueueConnection) {
+ 			// Call DestroyCluster() now in an attempt to get the schedd
+diff --git a/src/condor_tools/preen.cpp b/src/condor_tools/preen.cpp
+index 57fcd04..e2f9774 100644
+--- a/src/condor_tools/preen.cpp
++++ b/src/condor_tools/preen.cpp
+@@ -356,7 +356,8 @@ check_spool_dir()
+ 	well_known_list.append( ".pgpass" );
+ 	
+ 	// connect to the Q manager
+-	if (!(qmgr = ConnectQ (0))) {
++	Daemon d(DT_SCHEDD, 0);
++	if (!(qmgr = ConnectQ (d))) {
+ 		dprintf( D_ALWAYS, "Not cleaning spool directory: Can't contact schedd\n" );
+ 		return;
+ 	}
+diff --git a/src/condor_tools/qedit.cpp b/src/condor_tools/qedit.cpp
+index e36d844..61d1b63 100644
+--- a/src/condor_tools/qedit.cpp
++++ b/src/condor_tools/qedit.cpp
+@@ -131,7 +131,7 @@ main(int argc, char *argv[])
+ 	}
+ 
+ 	// Open job queue 
+-	q = ConnectQ( schedd.addr(), 0, false, NULL, NULL, schedd.version() );
++	q = ConnectQ( schedd, 0, false, NULL, NULL, schedd.version() );
+ 	if( !q ) {
+ 		fprintf( stderr, "Failed to connect to queue manager %s\n", 
+ 				 schedd.addr() );
+diff --git a/src/condor_tools/tool.cpp b/src/condor_tools/tool.cpp
+index 5e63dc7..8b3ba37 100644
+--- a/src/condor_tools/tool.cpp
++++ b/src/condor_tools/tool.cpp
+@@ -1167,8 +1167,8 @@ resolveNames( DaemonList* daemon_list, StringList* name_list )
+ 	}
+ 
+ 
+-	if (pool_addr) {
+-		q_result = query.fetchAds(ads, pool_addr, &errstack);
++	if (pool) {
++		q_result = query.fetchAds(ads, *pool, &errstack);
+ 	} else {
+ 		CollectorList * collectors = CollectorList::create();
+ 		q_result = collectors->query (query, ads);
+diff --git a/src/condor_transferd/td_init.cpp b/src/condor_transferd/td_init.cpp
+index 1fccebd..f2330e1 100644
+--- a/src/condor_transferd/td_init.cpp
++++ b/src/condor_transferd/td_init.cpp
+@@ -277,7 +277,7 @@ TransferD::setup_transfer_request_handler(int  /*cmd*/, Stream *sock)
+ 	///////////////////////////////////////////////////////////////
+ 	if( ! rsock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack) ) {
++		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack, NULL) ) {
+ 			// we failed to authenticate, we should bail out now
+ 			// since we don't know what user is trying to perform
+ 			// this action.
+diff --git a/src/condor_transferd/td_read_files.cpp b/src/condor_transferd/td_read_files.cpp
+index a6c7f87..4febc43 100644
+--- a/src/condor_transferd/td_read_files.cpp
++++ b/src/condor_transferd/td_read_files.cpp
+@@ -67,7 +67,7 @@ TransferD::read_files_handler(int cmd, Stream *sock)
+ 	/////////////////////////////////////////////////////////////////////////
+ 	if( ! rsock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack) ) {
++		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack, NULL) ) {
+ 			// we failed to authenticate, we should bail out now
+ 			// since we don't know what user is trying to perform
+ 			// this action.
+diff --git a/src/condor_transferd/td_write_files.cpp b/src/condor_transferd/td_write_files.cpp
+index 412a552..572cc79 100644
+--- a/src/condor_transferd/td_write_files.cpp
++++ b/src/condor_transferd/td_write_files.cpp
+@@ -67,7 +67,7 @@ TransferD::write_files_handler(int cmd, Stream *sock)
+ 	/////////////////////////////////////////////////////////////////////////
+ 	if( ! rsock->triedAuthentication() ) {
+ 		CondorError errstack;
+-		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack) ) {
++		if( ! SecMan::authenticate_sock(rsock, WRITE, &errstack, NULL) ) {
+ 			// we failed to authenticate, we should bail out now
+ 			// since we don't know what user is trying to perform
+ 			// this action.
+diff --git a/src/condor_utils/classad_command_util.cpp b/src/condor_utils/classad_command_util.cpp
+index 56d7ddb..1ae11a8 100644
+--- a/src/condor_utils/classad_command_util.cpp
++++ b/src/condor_utils/classad_command_util.cpp
+@@ -92,7 +92,7 @@ getCmdFromReliSock( ReliSock* s, ClassAd* ad, bool force_auth )
+     s->decode();
+     if( force_auth && ! s->triedAuthentication() ) {
+ 		CondorError errstack;
+-        if( ! SecMan::authenticate_sock(s, WRITE, &errstack) ) {
++        if( ! SecMan::authenticate_sock(s, WRITE, &errstack, NULL) ) {
+                 // we failed to authenticate, we should bail out now
+                 // since we don't know what user is trying to perform
+                 // this action.
+diff --git a/src/condor_utils/condor_q.cpp b/src/condor_utils/condor_q.cpp
+index 886b664..c540bbd 100644
+--- a/src/condor_utils/condor_q.cpp
++++ b/src/condor_utils/condor_q.cpp
+@@ -28,6 +28,7 @@
+ #include "CondorError.h"
+ #include "condor_classad.h"
+ #include "quill_enums.h"
++#include "daemon.h"
+ 
+ #ifdef HAVE_EXT_POSTGRESQL
+ #include "pgsqldatabase.h"
+@@ -230,7 +231,8 @@ fetchQueue (ClassAdList &list, StringList &attrs, ClassAd *ad, CondorError* errs
+ 	if (ad == 0)
+ 	{
+ 		// local case
+-		if( !(qmgr = ConnectQ( 0, connect_timeout, true, errstack)) ) {
++		Daemon d(DT_SCHEDD, 0, 0);
++		if( !(qmgr = ConnectQ( d, connect_timeout, true, errstack)) ) {
+ 			errstack->push("TEST", 0, "FOO");
+ 			return Q_SCHEDD_COMMUNICATION_ERROR;
+ 		}
+@@ -241,8 +243,9 @@ fetchQueue (ClassAdList &list, StringList &attrs, ClassAd *ad, CondorError* errs
+ 		// remote case to handle condor_globalq
+ 		if (!ad->LookupString (ATTR_SCHEDD_IP_ADDR, scheddString))
+ 			return Q_NO_SCHEDD_IP_ADDR;
++		Daemon d(ad, DT_SCHEDD, NULL);
+ 
+-		if( !(qmgr = ConnectQ( scheddString, connect_timeout, true, errstack)) )
++		if( !(qmgr = ConnectQ( d, connect_timeout, true, errstack)) )
+ 			return Q_SCHEDD_COMMUNICATION_ERROR;
+ 
+ 	}
+@@ -255,7 +258,7 @@ fetchQueue (ClassAdList &list, StringList &attrs, ClassAd *ad, CondorError* errs
+ }
+ 
+ int CondorQ::
+-fetchQueueFromHost (ClassAdList &list, StringList &attrs, const char *host, char const *schedd_version, CondorError* errstack)
++fetchQueueFromDaemon (ClassAdList &list, StringList &attrs, Daemon &daemon, char const *schedd_version, CondorError* errstack)
+ {
+ 	Qmgr_connection *qmgr;
+ 	ExprTree		*tree;
+@@ -276,7 +279,7 @@ fetchQueueFromHost (ClassAdList &list, StringList &attrs, const char *host, char
+ 	 optimal.  :^).
+ 	*/
+ 	init();  // needed to get default connect_timeout
+-	if( !(qmgr = ConnectQ( host, connect_timeout, true, errstack)) )
++	if( !(qmgr = ConnectQ( daemon, connect_timeout, true, errstack)) )
+ 		return Q_SCHEDD_COMMUNICATION_ERROR;
+ 
+ 	bool useFastPath = false;
+@@ -353,7 +356,7 @@ CondorQ::fetchQueueFromDB (ClassAdList &list,
+ }
+ 
+ int
+-CondorQ::fetchQueueFromHostAndProcess ( const char *host,
++CondorQ::fetchQueueFromDaemonAndProcess ( Daemon &daemon,
+ 										StringList &attrs,
+ 										process_function process_func,
+ 										bool useFastPath,
+@@ -378,7 +381,7 @@ CondorQ::fetchQueueFromHostAndProcess ( const char *host,
+ 	 optimal.  :^).
+ 	*/
+ 	init();  // needed to get default connect_timeout
+-	if( !(qmgr = ConnectQ( host, connect_timeout, true, errstack)) )
++	if( !(qmgr = ConnectQ( daemon, connect_timeout, true, errstack)) )
+ 		return Q_SCHEDD_COMMUNICATION_ERROR;
+ 
+ 	// get the ads and filter them
+diff --git a/src/condor_utils/condor_q.h b/src/condor_utils/condor_q.h
+index 7f6a620..ccd9196 100644
+--- a/src/condor_utils/condor_q.h
++++ b/src/condor_utils/condor_q.h
+@@ -23,6 +23,7 @@
+ #include "condor_common.h"
+ #include "generic_query.h"
+ #include "CondorError.h"
++#include "daemon.h"
+ 
+ #define MAXOWNERLEN 20
+ #define MAXSCHEDDLEN 255
+@@ -90,8 +91,8 @@ class CondorQ
+ 	// which pass the criterion specified by the constraints; default is
+ 	// from the local schedd
+ 	int fetchQueue (ClassAdList &, StringList &attrs, ClassAd * = 0, CondorError* errstack = 0);
+-	int fetchQueueFromHost (ClassAdList &, StringList &attrs, const char * = 0, char const *schedd_version = 0,CondorError* errstack = 0);
+-	int fetchQueueFromHostAndProcess ( const char *, StringList &attrs, process_function process_func, bool useFastPath, CondorError* errstack = 0);
++	int fetchQueueFromDaemon (ClassAdList &, StringList &attrs, Daemon &, char const *schedd_version = 0,CondorError* errstack = 0);
++	int fetchQueueFromDaemonAndProcess ( Daemon &, StringList &attrs, process_function process_func, bool useFastPath, CondorError* errstack = 0);
+ 	
+ 		// fetch the job ads from database 	
+ 	int fetchQueueFromDB (ClassAdList &, char *&lastUpdate, const char * = 0, CondorError* errstack = 0);
+diff --git a/src/condor_utils/condor_query.cpp b/src/condor_utils/condor_query.cpp
+index 95bc78a..acc6201 100644
+--- a/src/condor_utils/condor_query.cpp
++++ b/src/condor_utils/condor_query.cpp
+@@ -386,10 +386,6 @@ addORConstraint (const char *value)
+ QueryResult CondorQuery::
+ fetchAds (ClassAdList &adList, const char *poolName, CondorError* errstack)
+ {
+-	Sock*    sock; 
+-	int                     more;
+-	QueryResult result;
+-	ClassAd     queryAd(extraAttrs), *ad;
+ 
+ 	if ( !poolName ) {
+ 		return Q_NO_COLLECTOR_HOST;
+@@ -402,7 +398,16 @@ fetchAds (ClassAdList &adList, const char *poolName, CondorError* errstack)
+ 		return Q_NO_COLLECTOR_HOST;
+ 	}
+ 
++	return fetchAds(adList, my_collector, errstack);
++}
+ 
++QueryResult CondorQuery::
++fetchAds (ClassAdList &adList, Daemon &my_collector, CondorError* errstack)
++{
++	Sock*    sock; 
++	int                     more;
++	QueryResult result;
++	ClassAd     queryAd(extraAttrs), *ad;
+ 	// make the query ad
+ 	result = getQueryAd (queryAd);
+ 	if (result != Q_OK) return result;
+diff --git a/src/condor_utils/condor_query.h b/src/condor_utils/condor_query.h
+index 7e58eef..9fedcad 100644
+--- a/src/condor_utils/condor_query.h
++++ b/src/condor_utils/condor_query.h
+@@ -156,6 +156,7 @@ class CondorQuery
+ 
+ 	// fetch from collector
+ 	QueryResult fetchAds (ClassAdList &adList, const char * pool, CondorError* errstack = NULL);
++	QueryResult fetchAds (ClassAdList &adList, Daemon &daemon, CondorError* errstack = NULL);
+ 
+ 
+ 	// filter list of ads; arg1 is 'in', arg2 is 'out'
+diff --git a/src/condor_utils/ipv6_hostname.cpp b/src/condor_utils/ipv6_hostname.cpp
+index cfefb4b..3666bd4 100644
+--- a/src/condor_utils/ipv6_hostname.cpp
++++ b/src/condor_utils/ipv6_hostname.cpp
+@@ -197,10 +197,13 @@ int get_fqdn_and_ip_from_hostname(const MyString& hostname,
+ 	MyString ret;
+ 	condor_sockaddr ret_addr;
+ 	bool found_ip = false;
++	bool use_given_name = false;
+ 
+ 	// if the hostname contains dot, hostname is assumed to be full hostname
+ 	if (hostname.FindChar('.') != -1) {
+ 		ret = hostname;
++		fqdn = hostname;
++		use_given_name = true;
+ 	}
+ 
+ 	if (nodns_enabled()) {
+@@ -219,7 +222,9 @@ int get_fqdn_and_ip_from_hostname(const MyString& hostname,
+ 
+ 		while (addrinfo* info = ai.next()) {
+ 			if (info->ai_canonname) {
+-				fqdn = info->ai_canonname;
++				dprintf(D_HOSTNAME, "Found canon addr: %s\n", info->ai_canonname);
++				if (!use_given_name)
++					fqdn = info->ai_canonname;
+ 				addr = condor_sockaddr(info->ai_addr);
+ 				return 1;
+ 			}
+diff --git a/src/condor_who/who.cpp b/src/condor_who/who.cpp
+index 08f19b6..870668a 100644
+--- a/src/condor_who/who.cpp
++++ b/src/condor_who/who.cpp
+@@ -681,7 +681,7 @@ main( int argc, char *argv[] )
+ 		ClassAdList result;
+ 		if (addr || App.diagnostic) {
+ 			CondorError errstack;
+-			QueryResult qr = query->fetchAds (result, addr, &errstack);
++			QueryResult qr = dae->locate() ? query->fetchAds (result, *dae, &errstack) : query->fetchAds (result, addr, &errstack);
+ 			if (Q_OK != qr) {
+ 				fprintf( stderr, "Error: %s\n", getStrQueryResult(qr) );
+ 				fprintf( stderr, "%s\n", errstack.getFullText(true) );

@@ -1,0 +1,34 @@
+diff --git a/src/condor_gridmanager/gahp-client.cpp b/src/condor_gridmanager/gahp-client.cpp
+index 48c6b15..b0a44d8 100644
+--- a/src/condor_gridmanager/gahp-client.cpp
++++ b/src/condor_gridmanager/gahp-client.cpp
+@@ -703,6 +703,16 @@ GahpServer::Startup()
+ 		free( tmp_char );
+ 	}
+ 
++	// GLOBUS_LOCATION needs to be set for the blahp; otherwise, it defaults to /opt/globus,
++	// which is likely never correct
++	tmp_char = param("GLOBUS_LOCATION");
++	if ( tmp_char ) {
++		newenv.SetEnv( "GLOBUS_LOCATION", tmp_char );
++		free( tmp_char );
++	} else if (getenv("GLOBUS_LOCATION") == NULL) {
++		newenv.SetEnv( "GLOBUS_LOCATION", "/usr" );
++	}
++
+ 	// For amazon ec2 ca authentication
+ 	tmp_char = param("SOAP_SSL_CA_FILE");
+ 	if( tmp_char ) {
+diff --git a/src/condor_gridmanager/infnbatchjob.cpp b/src/condor_gridmanager/infnbatchjob.cpp
+index b76bc4f..f6751a1 100644
+--- a/src/condor_gridmanager/infnbatchjob.cpp
++++ b/src/condor_gridmanager/infnbatchjob.cpp
+@@ -224,7 +224,7 @@ INFNBatchJob::INFNBatchJob( ClassAd *classad )
+ 	free( gahp_path );
+ 
+ 	myResource = INFNBatchResource::FindOrCreateResource( batchType,
+-														  gahp_args.GetArg(0) );
++														  (gahp_args.Count() > 0) ? gahp_args.GetArg(0) : "localhost" );
+ 	myResource->RegisterJob( this );
+ 	if ( remoteJobId ) {
+ 		myResource->AlreadySubmitted( this );

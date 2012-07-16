@@ -1,4 +1,6 @@
-%define tarball_version 7.7.5
+%define tarball_version 7.9.1
+
+%define _default_patch_fuzz 2
 
 # Things for F15 or later
 %if 0%{?fedora} >= 15
@@ -10,15 +12,19 @@
 %define qmf 1
 %else
 %define deltacloud 0
-%define aviary 0
+%define aviary 1
 %define plumage 0
 %define systemd 0
 %define cgroups 0
 %define qmf 1
 %endif
 
+%if 0%{?rhel} >= 6
+%define cgroups 1
+%endif
+
 # Things not turned on, or don't have Fedora packages yet
-%define blahp 0
+%define blahp 1
 %define glexec 1
 
 # These flags are meant for developers; it allows one to build Condor
@@ -26,14 +32,14 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev c42c744
+%define git_rev ceb6a0a
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.7.5
-%define condor_base_release 0.3
+Version: 7.9.1
+%define condor_base_release 0.2
 %if %git_build
-	%define condor_release %condor_base_release.%{git_rev}git
+	%define condor_release %condor_base_release.%{git_rev}.git
 %else
 	%define condor_release %condor_base_release
 %endif
@@ -92,7 +98,15 @@ Source3: condor.service
 Patch0: condor_config.generic.patch
 Patch1: chkconfig_off.patch
 
-Patch8: hcc_config.patch
+Patch2: hcc_config.patch
+Patch3: wso2-axis2.patch
+Patch4: condor_pid_namespaces_v7.patch
+Patch5: condor_partial_defrag_v2.patch
+Patch6: cgroups_noswap.patch
+Patch7: cgroup_reset_stats.patch
+Patch8: condor-gahp.patch
+Patch9: cgahp_scaling.patch
+Patch10: condor-1605-v2.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -161,6 +175,7 @@ Requires: libcgroup >= 0.37
 %endif
 
 %if %blahp
+BuildRequires: blahp >= 1.16.1
 Requires: blahp >= 1.16.1
 %endif
 %if %glexec
@@ -176,9 +191,6 @@ Requires: python >= 2.2
 Requires: condor-classads = %{version}-%{release}
 Requires: condor-procd = %{version}-%{release}
 
-%if %blahp
-Requires: blahp >= 1.16.1
-%endif
 # libcgroup < 0.37 has a bug that invalidates our accounting.
 Requires: libcgroup >= 0.37
 
@@ -355,9 +367,17 @@ exit 0
 %setup -q -n %{name}-%{tarball_version}
 %endif
 
-#%patch0 -p1
-
-#%patch8 -p1
+%patch0 -p1
+%patch1 -p1
+%patch2 -p1
+%patch3 -p0
+%patch4 -p1
+%patch5 -p1
+%patch6 -p1
+%patch7 -p1
+%patch8 -p1
+%patch9 -p1
+%patch10 -p1
 
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
@@ -396,6 +416,12 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_MANAGEMENT:BOOL=FALSE \
 %endif
        -DWANT_FULL_DEPLOYMENT:BOOL=TRUE \
+%if %blahp
+       -DBLAHP_FOUND=/usr/libexec/BLClient \
+       -DWITH_BLAHP:BOOL=TRUE \
+%else
+       -DWITH_BLAHP:BOOL=FALSE \
+%endif
 %if %glexec
        -DWANT_GLEXEC:BOOL=TRUE \
 %else
@@ -413,6 +439,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %endif
 
 make %{?_smp_mflags}
+#make
 
 
 %install
@@ -436,7 +463,7 @@ populate %_sysconfdir/condor %{buildroot}/%{_usr}/lib/condor_ssh_to_job_sshd_con
 populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
 # Except for the shared libs
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
-populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libcondor_utils.so
+populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libcondor_utils*.so
 rm -f %{buildroot}/%{_datadir}/condor/libclassad.a
 
 %if %aviary || %qmf
@@ -528,7 +555,6 @@ rm %{buildroot}/%{_mandir}/man1/condor_configure.1
 # not packaging legacy cruft
 #rm %{buildroot}/%{_mandir}/man1/condor_master_off.1
 #rm %{buildroot}/%{_mandir}/man1/condor_reconfig_schedd.1
-rm %{buildroot}/%{_mandir}/man1/condor_convert_history.1
 
 # not packaging quill bits
 rm %{buildroot}/%{_mandir}/man1/condor_load_history.1
@@ -639,8 +665,6 @@ rm -rf %{buildroot}
 # dep problem in 7.7.3
 #%_datadir/condor/Condor.pm
 %_datadir/condor/scimark2lib.jar
-%_datadir/condor/gt4-gahp.jar
-%_datadir/condor/gt42-gahp.jar
 %dir %_sysconfdir/condor/config.d/
 %_sysconfdir/condor/config.d/00personal_condor.config
 %_sysconfdir/condor/condor_ssh_to_job_sshd_config_template
@@ -649,7 +673,6 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_ssh
 %_libexecdir/condor/sshd.sh
 %_libexecdir/condor/condor_job_router
-%_libexecdir/condor/gridftp_wrapper.sh
 %if %glexec
 %_libexecdir/condor/condor_glexec_setup
 %_libexecdir/condor/condor_glexec_run
@@ -657,6 +680,9 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_glexec_update_proxy
 %_libexecdir/condor/condor_glexec_cleanup
 %_libexecdir/condor/condor_glexec_kill
+%endif
+%if %blahp
+%_libexecdir/condor/glite/bin/*
 %endif
 %_libexecdir/condor/condor_limits_wrapper.sh
 %_libexecdir/condor/condor_rooster
@@ -713,8 +739,10 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_glidein.1.gz
 %_mandir/man1/condor_continue.1.gz
 %_mandir/man1/condor_suspend.1.gz
+%_mandir/man1/condor_gather_info.1.gz
+%_mandir/man1/condor_router_rm.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
-%_libdir/libcondor_utils.so
+%_libdir/libcondor_utils*.so
 #%_bindir/condor
 %_bindir/condor_submit_dag
 %_bindir/condor_prio
@@ -753,6 +781,7 @@ rm -rf %{buildroot}
 %_bindir/condor_suspend
 %_bindir/condor_test_match
 %_bindir/condor_glidein
+%_bindir/condor_who
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
 #%_sbindir/condor
@@ -784,9 +813,9 @@ rm -rf %{buildroot}
 %_sbindir/condor_gridshell
 %_sbindir/gahp_server
 %_sbindir/grid_monitor.sh
+%_sbindir/grid_monitor
 %_sbindir/nordugrid_gahp
-%_sbindir/gt4_gahp
-%_sbindir/gt42_gahp
+%_sbindir/remote_gahp
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
@@ -797,12 +826,14 @@ rm -rf %{buildroot}
 %ghost %dir %_var/run/condor/
 %else
 %dir %_var/lock/condor
+%dir %_var/lock/condor/local
 %dir %_var/run/condor
 %endif
 
-# For Condor 7.7.5
 %_bindir/condor_drain
 %_libexecdir/condor/condor_defrag
+%_datadir/condor/libcondorapi.so
+%_libexecdir/condor/interactive.sub
 
 %files procd
 %_sbindir/condor_procd
@@ -838,6 +869,7 @@ rm -rf %{buildroot}
 %_sysconfdir/condor/config.d/61aviary.config
 %dir %_libdir/condor/plugins
 %_libdir/condor/plugins/AviaryScheddPlugin-plugin.so
+%_libdir/condor/plugins/AviaryLocatorPlugin-plugin.so
 %_sbindir/aviary_query_server
 %dir %_datadir/condor/aviary
 %_datadir/condor/aviary/jobcontrol.py*
@@ -845,6 +877,7 @@ rm -rf %{buildroot}
 %_datadir/condor/aviary/submissions.py*
 %_datadir/condor/aviary/submit.py*
 %_datadir/condor/aviary/setattr.py*
+%_datadir/condor/aviary/jobinventory.py*
 %dir %_datadir/condor/aviary/dag
 %_datadir/condor/aviary/dag/diamond.dag
 %_datadir/condor/aviary/dag/dag-submit.py*
@@ -853,6 +886,8 @@ rm -rf %{buildroot}
 %_datadir/condor/aviary/module/aviary/util.py*
 %_datadir/condor/aviary/module/aviary/https.py*
 %_datadir/condor/aviary/module/aviary/__init__.py*
+%_datadir/condor/aviary/locator.py*
+%_datadir/condor/aviary/submission_ids.py*
 %_datadir/condor/aviary/README
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/aviary
@@ -870,6 +905,11 @@ rm -rf %{buildroot}
 %_var/lib/condor/aviary/services/query/aviary-common.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.wsdl
+%_var/lib/condor/aviary/services/locator/aviary-common.xsd
+%_var/lib/condor/aviary/services/locator/aviary-locator.wsdl
+%_var/lib/condor/aviary/services/locator/aviary-locator.xsd
+%_var/lib/condor/aviary/services/locator/services.xml
+%_var/lib/condor/aviary/services/locator/libaviary_locator_axis.so
 %endif
 
 %if %plumage
@@ -898,6 +938,7 @@ rm -rf %{buildroot}
 %doc LICENSE-2.0.txt NOTICE.txt
 %_sbindir/condor_vm-gahp
 #%_sbindir/condor_vm_vmware.pl
+%_sbindir/condor_vm_vmware
 #%_sbindir/condor_vm_xen.sh
 %_libexecdir/condor/libvirt_simple_script.awk
 
@@ -913,8 +954,7 @@ rm -rf %{buildroot}
 %files classads
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
-%_libdir/libclassad.so.%{version}
-%_libdir/libclassad.so.2
+%_libdir/libclassad.so.*
 
 #################
 %files classads-devel
@@ -954,6 +994,7 @@ rm -rf %{buildroot}
 %_includedir/classad/xmlLexer.h
 %_includedir/classad/xmlSink.h
 %_includedir/classad/xmlSource.h
+%_includedir/classad/classadCache.h
 
 %if %systemd
 %post
@@ -971,10 +1012,9 @@ fi
 
 %postun
 /bin/systemctl daemon-reload >/dev/null 2>&1 || :
-if [ $1 -ge 1 ] ; then
-    # Package upgrade, not uninstall
-    /bin/systemctl try-restart condor.service >/dev/null 2>&1 || :
-fi
+# Note we don't try to restart - Condor will automatically notice the
+# binary has changed and do graceful or peaceful restart, based on its
+# configuration
 
 %triggerun -- condor < 7.7.0-0.5
 
@@ -1001,13 +1041,60 @@ fi
 
 
 %postun -n condor
-if [ "$1" -ge "1" ]; then
-  /sbin/service condor condrestart >/dev/null 2>&1 || :
-fi
+# Note we don't try to restart - Condor will automatically notice the
+# binary has changed and do graceful or peaceful restart, based on its
+# configuration
 /sbin/ldconfig
 %endif
 
 %changelog
+* Fri Jul 13 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.2.013069b.git
+- Hunt down segfault bug.
+
+* Fri Jul 13 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.1.013069b.git
+- Update to latest master.
+
+* Tue Jun 19 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.14.888a81cgit
+- Fix DNS-based hostname checks for GSI.
+- Add the user lock directory to the file listing.
+
+* Sun Jun 17 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.13.888a81cgit
+- Patch for C-GAHP client scalability.
+
+* Fri Jun 15 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.12.888a81cgit
+- Fix re-acquisition of routed jobs on JR restart.
+- Allow DNS-based hostname checks for GSI.
+- Allow the queue super-user to impersonate any other user.
+
+* Wed Jun 2 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.11.888a81cgit
+- Fix proxy handling for Condor-C submissions.
+
+* Wed May 30 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.10.888a81cgit
+- Fix blahp segfault and GLOBUS_LOCATION.
+- Allow a 2-schedd setup for JobRouter.
+
+* Mon May 28 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.8.257bc70git
+- Re-enable blahp
+
+* Wed May 17 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.7.257bc70git
+- Fix reseting of cgroup statistics.
+
+* Wed May 16 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.6.257bc70git
+- Fix for procd when there is no swap accounting.
+- Allow condor_defrag to cancel draining when it is happy with things.
+
+* Mon May 11 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.5.257bc70git
+- Fix for autofs support.
+
+* Mon Apr 09 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.0-0.1.2693346git.1
+- Update to the 7.9.0 branch.
+
+* Fri Feb 10 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.7.5-0.9.3513b55git
+- Fix fd leak for cgroups in the procd.
+
+* Fri Feb 10 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.7.5-0.8.3513b55git
+- Enable cgroups for EL6.
+
 * Tue Oct 25 2011 <tstclair@redhat.com> - 7.7.3-0.1
 - Fast forward to 7.7.3 pre release
 

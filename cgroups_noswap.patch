@@ -1,0 +1,100 @@
+diff --git a/src/condor_procd/proc_family.cpp b/src/condor_procd/proc_family.cpp
+index d35ffcc..2a5839f 100644
+--- a/src/condor_procd/proc_family.cpp
++++ b/src/condor_procd/proc_family.cpp
+@@ -36,6 +36,10 @@
+ 
+ #include <unistd.h>
+ long ProcFamily::clock_tick = sysconf( _SC_CLK_TCK );
++
++// Swap accounting is sometimes turned off.  We use this variable so we
++// warn about that situation only once.
++bool ProcFamily::have_warned_about_memsw = false;
+ #endif
+ 
+ ProcFamily::ProcFamily(ProcFamilyMonitor* monitor,
+@@ -425,10 +429,19 @@ ProcFamily::update_max_image_size_cgroup()
+ 		return;
+ 	}
+ 	if ((err = cgroup_get_value_uint64(memct, "memory.memsw.max_usage_in_bytes", &max_image))) {
+-		dprintf(D_PROCFAMILY,
+-			"Unable to load max memory usage for cgroup %s (ProcFamily %u): %u %s\n",
+-			m_cgroup_string.c_str(), m_root_pid, err, cgroup_strerror(err));
+-		return;
++		// On newer nodes, swap accounting is disabled by default.
++		// In some cases, swap accounting causes a kernel oops at the time of writing.
++		// So, we check memory.max_usage_in_bytes instead.
++		int err2 = cgroup_get_value_uint64(memct, "memory.max_usage_in_bytes", &max_image);
++		if (err2) {
++			dprintf(D_PROCFAMILY,
++				"Unable to load max memory usage for cgroup %s (ProcFamily %u): %u %s\n",
++				m_cgroup_string.c_str(), m_root_pid, err, cgroup_strerror(err));
++			return;
++		} else if (!have_warned_about_memsw) {
++			have_warned_about_memsw = true;
++			dprintf(D_ALWAYS, "Swap acounting is not available; only doing RAM accounting.\n");
++		}
+ 	}
+ 	m_max_image_size = max_image/1024;
+ }
+diff --git a/src/condor_procd/proc_family.h b/src/condor_procd/proc_family.h
+index 28a854c..d831d8e 100644
+--- a/src/condor_procd/proc_family.h
++++ b/src/condor_procd/proc_family.h
+@@ -181,6 +181,7 @@ private:
+ 	std::string m_cgroup_string;
+ 	CgroupManager &m_cm;
+ 	static long clock_tick;
++	static bool have_warned_about_memsw;
+ 
+ 	int count_tasks_cgroup();
+ 	int aggregate_usage_cgroup_blockio(ProcFamilyUsage*);
+diff --git a/src/condor_starter.V6.1/cgroup.linux.cpp b/src/condor_starter.V6.1/cgroup.linux.cpp
+index 97407b3..4fbd00d 100644
+--- a/src/condor_starter.V6.1/cgroup.linux.cpp
++++ b/src/condor_starter.V6.1/cgroup.linux.cpp
+@@ -185,13 +185,6 @@ int CgroupManager::create(const std::string &cgroup_string, Cgroup &cgroup,
+ 			has_cgroup, changed_cgroup)) {
+ 		return -1;
+ 	}
+-        if ((preferred_controllers & CPUACCT_CONTROLLER) &&
+-                initialize_controller(*cgroupp, CPUACCT_CONTROLLER,
+-                        CPUACCT_CONTROLLER_STR,
+-                        required_controllers & CPUACCT_CONTROLLER,
+-                        has_cgroup, changed_cgroup)) {
+-		return -1;
+-        }
+ 	if ((preferred_controllers & BLOCK_CONTROLLER) &&
+ 		initialize_controller(*cgroupp, BLOCK_CONTROLLER,
+ 			BLOCK_CONTROLLER_STR,
+diff --git a/src/condor_starter.V6.1/cgroup_limits.cpp b/src/condor_starter.V6.1/cgroup_limits.cpp
+index 71830a5..93e311c 100644
+--- a/src/condor_starter.V6.1/cgroup_limits.cpp
++++ b/src/condor_starter.V6.1/cgroup_limits.cpp
+@@ -20,7 +20,7 @@ CgroupLimits::CgroupLimits(std::string &cgroup) : m_cgroup_string(cgroup)
+ int CgroupLimits::set_memory_limit_bytes(uint64_t mem_bytes, bool soft)
+ {
+ 	if (!m_cgroup.isValid() || !CgroupManager::getInstance().isMounted(CgroupManager::MEMORY_CONTROLLER)) {
+-		dprintf(D_ALWAYS, "Unable to set memory limit because cgroup is invalid.");
++		dprintf(D_ALWAYS, "Unable to set memory limit because cgroup is invalid.\n");
+ 		return 1;
+ 	}
+ 
+@@ -55,7 +55,7 @@ int CgroupLimits::set_memory_limit_bytes(uint64_t mem_bytes, bool soft)
+ int CgroupLimits::set_cpu_shares(uint64_t shares)
+ {
+ 	if (!m_cgroup.isValid() || !CgroupManager::getInstance().isMounted(CgroupManager::CPU_CONTROLLER)) {
+-		dprintf(D_ALWAYS, "Unable to set CPU shares because cgroup is invalid.");
++		dprintf(D_ALWAYS, "Unable to set CPU shares because cgroup is invalid.\n");
+ 		return 1;
+ 	}
+ 
+@@ -89,7 +89,7 @@ int CgroupLimits::set_cpu_shares(uint64_t shares)
+ int CgroupLimits::set_blockio_weight(uint64_t weight)
+ {
+ 	if (!m_cgroup.isValid() || !CgroupManager::getInstance().isMounted(CgroupManager::BLOCK_CONTROLLER)) {
+-		dprintf(D_ALWAYS, "Unable to set blockio weight because cgroup is invalid.");
++		dprintf(D_ALWAYS, "Unable to set blockio weight because cgroup is invalid.\n");
+ 		return 1;
+ 	}
+ 
