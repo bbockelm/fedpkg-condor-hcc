@@ -24,8 +24,8 @@
 %endif
 
 # Things not turned on, or don't have Fedora packages yet
-%define blahp 1
-%define glexec 1
+%define blahp 0
+%define glexec 0
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
