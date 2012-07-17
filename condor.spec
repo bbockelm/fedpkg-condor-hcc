@@ -24,20 +24,21 @@
 %endif
 
 # Things not turned on, or don't have Fedora packages yet
-%define blahp 0
-%define glexec 0
+%define blahp 1
+%define glexec 1
+%define cream 1
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev ceb6a0a
+%define git_rev 2e636b9
 
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.9.1
-%define condor_base_release 0.2
+%define condor_base_release 0.5
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
 %else
@@ -53,7 +54,7 @@ URL: http://www.cs.wisc.edu/condor/
 
 # git clone http://condor-git.cs.wisc.edu/repos/condor.git
 # cd condor
-# git-archive master | gzip -7 > ~/rpmbuild/SOURCES/condor.tar.gz
+# git archive master | gzip -7 > ~/rpmbuild/SOURCES/condor.tar.gz
 Source0: condor.tar.gz
 
 %else
@@ -94,6 +95,8 @@ Source1: generate-tarball.sh
 %if %systemd
 Source2: %{name}-tmpfiles.conf
 Source3: %{name}.service
+%else
+Source4: condor-lcmaps-env.sysconfig
 %endif
 Patch0: condor_config.generic.patch
 Patch1: chkconfig_off.patch
@@ -101,12 +104,10 @@ Patch1: chkconfig_off.patch
 Patch2: hcc_config.patch
 Patch3: wso2-axis2.patch
 Patch4: condor_pid_namespaces_v7.patch
-Patch5: condor_partial_defrag_v2.patch
-Patch6: cgroups_noswap.patch
-Patch7: cgroup_reset_stats.patch
-Patch8: condor-gahp.patch
-Patch9: cgahp_scaling.patch
-Patch10: condor-1605-v2.patch
+Patch5: condor-gahp.patch
+Patch6: cgahp_scaling.patch
+Patch7: condor-1605-v2.patch
+Patch8: lcmaps_env_in_init_script.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -180,6 +181,14 @@ Requires: blahp >= 1.16.1
 %endif
 %if %glexec
 Requires: glexec
+%endif
+
+%if %cream
+BuildRequires: glite-ce-cream-client-devel
+BuildRequires: glite-lbjp-common-gsoap-plugin-devel
+BuildRequires: glite-ce-cream-utils
+BuildRequires: log4cpp-devel
+BuildRequires: gridsite-devel
 %endif
 
 %if %systemd
@@ -350,6 +359,17 @@ Obsoletes: classads-devel <= 1.0.8
 Header files for Condor's ClassAd Library, a powerful and flexible,
 semi-structured representation of data.
 
+%if %cream
+#######################
+%package cream-gahp
+Summary: Allows Condor to act as a client to CREAM.
+Group: Applications/System
+Requires: %name = %version-%release
+
+%description cream-gahp
+The cream_gahp enables the Condor grid universe to communicate with a remote
+CREAM server.
+%endif
 
 %pre
 getent group condor >/dev/null || groupadd -r condor
@@ -375,13 +395,13 @@ exit 0
 %patch5 -p1
 %patch6 -p1
 %patch7 -p1
-%patch8 -p1
-%patch9 -p1
-%patch10 -p1
 
 %if %systemd
 cp %{SOURCE2} %{name}-tmpfiles.conf
 cp %{SOURCE3} %{name}.service
+%else
+cp %{SOURCE4} %{name}-lcmaps-env.sysconfig
+%patch8 -p1
 %endif
 
 # fix errant execute permissions
@@ -426,6 +446,9 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_BLAHP:BOOL=TRUE \
 %else
        -DWITH_BLAHP:BOOL=FALSE \
+%endif
+%if %cream
+       -DWITH_CREAM:BOOL=TRUE \
 %endif
 %if %glexec
        -DWANT_GLEXEC:BOOL=TRUE \
@@ -579,6 +602,7 @@ cp %{name}.service %{buildroot}%{_unitdir}/condor.service
 # install the lsb init script
 mkdir -p %{buildroot}/%{_sysconfdir}/sysconfig
 touch %{buildroot}/%{_sysconfdir}/sysconfig/condor
+cp %{name}-lcmaps-env.sysconfig %{buildroot}/%{_sysconfdir}/sysconfig/%{name}-lcmaps-env
 install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
 %endif
 
@@ -661,6 +685,7 @@ rm -rf %{buildroot}
 %{_unitdir}/condor.service
 %else
 %config(noreplace) %_sysconfdir/sysconfig/condor
+%_sysconfdir/sysconfig/%{name}-lcmaps-env
 %_initrddir/condor
 %endif
 %dir %_datadir/condor/
@@ -805,7 +830,7 @@ rm -rf %{buildroot}
 %_sbindir/condor_reconfig
 %_sbindir/condor_replication
 %_sbindir/condor_restart
-%_sbindir/condor_root_switchboard
+%attr(6755, root, root) %_sbindir/condor_root_switchboard
 %_sbindir/condor_schedd
 %_sbindir/condor_shadow
 %_sbindir/condor_startd
@@ -1005,6 +1030,13 @@ rm -rf %{buildroot}
 %_includedir/classad/xmlSource.h
 %_includedir/classad/classadCache.h
 
+%if %cream
+%files cream-gahp
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sbindir/cream_gahp
+%endif
+
 %if %systemd
 %post
 if [ $1 -eq 1 ] ; then
@@ -1057,6 +1089,13 @@ fi
 %endif
 
 %changelog
+* Mon Jul 16 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.5.ceb6a0a.git
+- Upstreaming of many of the custom patches.
+
+* Mon Jul 16 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.4.ceb6a0a.git
+- Integrate CREAM support from OSG.
+- Create CREAM sub-package.
+
 * Fri Jul 13 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.2.013069b.git
 - Hunt down segfault bug.
 
