@@ -42,7 +42,7 @@ Version: 7.9.0
 %else
 	%define condor_release %condor_base_release
 %endif
-Release: %condor_release%{?dist}.2
+Release: %condor_release%{?dist}.3
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -1029,6 +1029,9 @@ fi
 %endif
 
 %changelog
+* Wed Jul 18 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 7.9.0-0.1.3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
+
 * Fri Apr 27 2012 <tstclair@redhat.com> - 7.9.0-0.1
 - Fast forward to 7.9.0 pre-release
 
