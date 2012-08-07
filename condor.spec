@@ -33,12 +33,12 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 2e636b9
+%define git_rev 70b9542
 
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.9.1
-%define condor_base_release 0.5
+%define condor_base_release 0.8
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
 %else
@@ -108,6 +108,9 @@ Patch5: condor-gahp.patch
 Patch6: cgahp_scaling.patch
 Patch7: condor-1605-v2.patch
 Patch8: lcmaps_env_in_init_script.patch
+# See gt3158
+Patch9: 0001-Apply-the-user-s-condor_config-last-rather-than-firs.patch
+Patch11: condor_oom_v3.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -126,6 +129,7 @@ BuildRequires: /usr/include/expat.h
 BuildRequires: openldap-devel
 BuildRequires: /usr/include/ldap.h
 BuildRequires: latex2html
+BuildRequires: boost-devel
 
 # Globus GSI build requirements
 BuildRequires: globus-gssapi-gsi-devel
@@ -395,6 +399,9 @@ exit 0
 %patch5 -p1
 %patch6 -p1
 %patch7 -p1
+%patch9 -p1
+#%patch10 -p1
+%patch11 -p1
 
 %if %systemd
 cp %{SOURCE2} %{name}-tmpfiles.conf
@@ -1089,6 +1096,9 @@ fi
 %endif
 
 %changelog
+* Tue Jul 24 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.6.ceb6a0a.git
+- Fix per-user condor config to be more useful.  See gt3158
+
 * Mon Jul 16 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.5.ceb6a0a.git
 - Upstreaming of many of the custom patches.
 
