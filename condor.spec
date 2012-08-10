@@ -1,7 +1,7 @@
-%define tarball_version 7.9.0
+%define tarball_version 7.9.1
 
 # Things for F15 or later
-%if 0%{?fedora} >= 15
+%if 0%{?fedora} >= 16
 %define deltacloud 1
 %define aviary 1
 %ifarch %{ix86} x86_64
@@ -35,7 +35,7 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.9.0
+Version: 7.9.1
 %define condor_base_release 0.1
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
@@ -87,9 +87,10 @@ Source0: condor.tar.gz
 #   6a7a42515d5ae6c8cb3c69492697e04f  condor_src-7.7.3-all-all.tar.gz
 #   32727366db9d0dcd57f5a41f2352f40d  condor_src-7.7.5-all-all.tar.gz
 #   5306421d1b937233b6f07caea9872e29  condor_src-7.9.0-all-all.tar.gz
+#   8f6ba9377309d0d961de538224664f5b  condor_src-7.9.1-all-all.tar.gz
 #
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.9.0-3b0e7b0c-GIT.tar.gz
+Source0: condor-7.9.1-65cac1a2-RH.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -97,8 +98,6 @@ Source1: generate-tarball.sh
 Source2: %{name}-tmpfiles.conf
 Source3: condor.service
 %endif
-Patch0: condor_config.generic.patch
-Patch1: chkconfig_off.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -186,8 +185,6 @@ Requires: blahp >= 1.16.1
 %if %glexec
 Requires: glexec
 %endif
-# libcgroup < 0.37 has a bug that invalidates our accounting.
-Requires: libcgroup >= 0.37
 
 Requires: initscripts
 
@@ -362,8 +359,6 @@ exit 0
 %setup -q -n %{name}-%{tarball_version}
 %endif
 
-%patch0 -p1 -F 3
-
 # fix errant execute permissions
 find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 
@@ -414,7 +409,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %endif
        -DWITH_GLOBUS:BOOL=TRUE \
 %if %cgroups
-       -DLIBCGROUP_FOUND_SEARCH_cgroup=/%{_lib}/libcgroup.so.1
+	-DWITH_LIBCGROUP:BOOL=TRUE
 %endif
 
 make 
@@ -471,8 +466,9 @@ if [ "$LIB" = "%_libdir" ]; then
   exit 1
 fi
 sed -e "s:^LIB\s*=.*:LIB = \$(RELEASE_DIR)/$LIB/condor:" \
-  %{buildroot}/etc/examples/condor_config.generic \
+  %{buildroot}/etc/examples/condor_config.generic.redhat \
   > %{buildroot}/%{_sysconfdir}/condor/condor_config
+
 
 # Install the basic configuration, a Personal Condor config. Allows for
 # yum install condor + service condor start and go.
@@ -534,7 +530,7 @@ rm %{buildroot}/%{_mandir}/man1/condor_configure.1
 # not packaging legacy cruft
 #rm %{buildroot}/%{_mandir}/man1/condor_master_off.1
 #rm %{buildroot}/%{_mandir}/man1/condor_reconfig_schedd.1
-rm %{buildroot}/%{_mandir}/man1/condor_convert_history.1
+#rm %{buildroot}/%{_mandir}/man1/condor_convert_history.1
 
 # not packaging quill bits
 rm %{buildroot}/%{_mandir}/man1/condor_load_history.1
@@ -616,7 +612,7 @@ rm -rf %{buildroot}%{_includedir}/user_log.c++.h
 rm -rf %{buildroot}%{_includedir}/write_user_log.h
 rm -rf %{buildroot}%{_libexecdir}/condor/bgp_*
 rm -rf %{buildroot}%{_datadir}/condor/libchirp_client.*
-rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
+rm -rf %{buildroot}%{_datadir}/condor/libcondorapi*
 # Remove some cluster suite stuff which doesn't work in 
 #rm -f %{buildroot}/etc/examples/cmd_cluster.rb
 #rm -f %{buildroot}/etc/examples/condor.sh
@@ -683,6 +679,7 @@ rm -rf %{buildroot}
 %_libexecdir/condor/glexec_starter_setup.sh
 %_libexecdir/condor/condor_defrag
 %_libexecdir/condor/condor_schedd.init
+%_libexecdir/condor/interactive.sub
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
 %_mandir/man1/condor_chirp.1.gz
@@ -726,10 +723,14 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_ssh_to_job.1.gz
 %_mandir/man1/condor_power.1.gz
 %_mandir/man1/condor_glidein.1.gz
+%_mandir/man1/condor_gather_info.1.gz
+%_mandir/man1/condor_router_rm.1.gz
+
 # bin/condor is a link for checkpoint, reschedule, vacate
-%_libdir/libcondor_utils_7_9_0.so
+%_libdir/libcondor_utils_7_9_1.so
 #%_bindir/condor
 %_bindir/condor_submit_dag
+%_bindir/condor_who
 %_bindir/condor_prio
 %_bindir/condor_transfer_data
 %_bindir/condor_check_userlogs
@@ -933,7 +934,7 @@ rm -rf %{buildroot}
 %files classads
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
-%_libdir/libclassad.so.3
+%_libdir/libclassad.so.4
 %_libdir/libclassad.so.%{tarball_version}
 
 #################
@@ -950,6 +951,7 @@ rm -rf %{buildroot}
 %_includedir/classad/classadErrno.h
 %_includedir/classad/classad.h
 %_includedir/classad/classadItor.h
+%_includedir/classad/classadCache.h
 %_includedir/classad/classad_stl.h
 %_includedir/classad/collectionBase.h
 %_includedir/classad/collection.h
@@ -1029,6 +1031,9 @@ fi
 %endif
 
 %changelog
+* Thu Aug 9 2012 <tstclair@redhat.com> - 7.9.1-0.1
+- Fast forward to 7.9.1 pre-release
+
 * Fri Apr 27 2012 <tstclair@redhat.com> - 7.9.0-0.1
 - Fast forward to 7.9.0 pre-release
 
