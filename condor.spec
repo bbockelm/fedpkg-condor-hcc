@@ -90,7 +90,7 @@ Source0: condor.tar.gz
 #   8f6ba9377309d0d961de538224664f5b  condor_src-7.9.1-all-all.tar.gz
 #
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.9.1-65cac1a2-RH.tar.gz
+Source0: condor-7.9.1-c88f1e4e-RH.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -979,6 +979,14 @@ rm -rf %{buildroot}
 
 %if %systemd
 %post
+test -x /usr/sbin/selinuxenabled && /usr/sbin/selinuxenabled
+if [ $? = 0 ]; then
+   restorecon -R -v /var/lock/condor
+   setsebool -P condor_domain_can_network_connect 1
+   semanage port -a -t condor_port_t -p tcp 12345
+   # the number of extraneous SELinux warnings on f17 is very high
+fi
+
 if [ $1 -eq 1 ] ; then
     # Initial installation 
     /bin/systemctl daemon-reload >/dev/null 2>&1 || :
@@ -1010,11 +1018,6 @@ fi
 %post -n condor
 /sbin/chkconfig --add condor
 /sbin/ldconfig
-#test -x /usr/sbin/selinuxenabled && /usr/sbin/selinuxenabled
-#if [ $? = 0 ]; then
-#   semanage fcontext -a -t unconfined_execmem_exec_t %_sbindir/condor_startd
-#   restorecon  %_sbindir/condor_startd
-#fi
 
 %preun -n condor
 if [ $1 = 0 ]; then
@@ -1031,8 +1034,9 @@ fi
 %endif
 
 %changelog
-* Thu Aug 9 2012 <tstclair@redhat.com> - 7.9.1-0.1
+* Wed Aug 15 2012 <tstclair@redhat.com> - 7.9.1-0.1
 - Fast forward to 7.9.1 pre-release
+- Fix CVE-2012-3416
 
 * Fri Apr 27 2012 <tstclair@redhat.com> - 7.9.0-0.1
 - Fast forward to 7.9.0 pre-release
