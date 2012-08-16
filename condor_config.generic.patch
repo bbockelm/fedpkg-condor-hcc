@@ -209,17 +209,6 @@
  
  ##  JAVA_CLASSPATH_ARGUMENT describes the command-line parameter
  ##  used to introduce a new classpath:
-@@ -2275,8 +2326,8 @@
- 
- ## What kind of virtual machine program will be used for 
- ## the VM universe?
--## The two options are vmware and xen.  (Required)
--#VM_TYPE = vmware
-+## The three primary options are KVM, Xen and VMware.  (Required: no default)
-+#VM_TYPE = kvm
- 
- ## How much memory can be used for the VM universe? (Required)
- ## This value is the maximum amount of memory that can be used by the 
 @@ -2503,7 +2554,7 @@
  #SSH_TO_JOB_SSHD_ARGS = "-i -e -f %f"
  

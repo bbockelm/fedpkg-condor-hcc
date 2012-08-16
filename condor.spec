@@ -33,12 +33,12 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 70b9542
+%define git_rev ecc9193
 
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: 7.9.1
-%define condor_base_release 0.8
+%define condor_base_release 0.11
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
 %else
@@ -111,6 +111,8 @@ Patch8: lcmaps_env_in_init_script.patch
 # See gt3158
 Patch9: 0001-Apply-the-user-s-condor_config-last-rather-than-firs.patch
 Patch11: condor_oom_v3.patch
+# From ZKM
+Patch12: zkm-782.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -402,6 +404,7 @@ exit 0
 %patch9 -p1
 #%patch10 -p1
 %patch11 -p1
+%patch12 -p1
 
 %if %systemd
 cp %{SOURCE2} %{name}-tmpfiles.conf
@@ -417,6 +420,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %build
 
 %cmake -DNO_PHONE_HOME:BOOL=TRUE \
+       -DBUILD_TESTING:BOOL=FALSE \
        -DHAVE_BACKFILL:BOOL=FALSE \
        -DHAVE_BOINC:BOOL=FALSE \
        -DWITH_GSOAP:BOOL=FALSE \
@@ -1096,6 +1100,15 @@ fi
 %endif
 
 %changelog
+* Wed Aug 15 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.11.ecc9193.git
+- Fixes to the JobRouter configuration.
+
+* Tue Aug 14 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.10.9e05bd9.git
+- Update to latest trunk so we can get the EditInPlace JobRouter configs.
+
+* Tue Aug 14 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.9.70b9542.git
+- Fix to IP-verify from ZKM.
+
 * Tue Jul 24 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.6.ceb6a0a.git
 - Fix per-user condor config to be more useful.  See gt3158
 
