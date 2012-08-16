@@ -6,7 +6,12 @@
 %if 0%{?fedora} >= 15
 %define deltacloud 1
 %define aviary 1
+%ifarch %{ix86} x86_64
+# mongodb supports only x86/x86_64
 %define plumage 1
+%else
+%define plumage 0
+%endif
 %define systemd 1
 %define cgroups 1
 %define qmf 1
@@ -87,8 +92,11 @@ Source0: condor.tar.gz
 #
 #   ecafed3e183e9fc6608dc9e55e4dd59b  condor_src-7.7.1-all-all.tar.gz
 #   6a7a42515d5ae6c8cb3c69492697e04f  condor_src-7.7.3-all-all.tar.gz
+#   32727366db9d0dcd57f5a41f2352f40d  condor_src-7.7.5-all-all.tar.gz
+#   5306421d1b937233b6f07caea9872e29  condor_src-7.9.0-all-all.tar.gz
+#
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.7.3-c39a8b84-GIT.tar.gz
+Source0: condor-7.9.0-3b0e7b0c-GIT.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -130,6 +138,7 @@ BuildRequires: /usr/include/curl/curl.h
 BuildRequires: /usr/include/expat.h
 BuildRequires: openldap-devel
 BuildRequires: /usr/include/ldap.h
+BuildRequires: qpid-qmf-devel
 BuildRequires: latex2html
 BuildRequires: boost-devel
 
@@ -181,20 +190,16 @@ BuildRequires: libcgroup-devel >= 0.37
 Requires: libcgroup >= 0.37
 %endif
 
-%if %blahp
-BuildRequires: blahp >= 1.16.1
-Requires: blahp >= 1.16.1
-%endif
-%if %glexec
-Requires: glexec
-%endif
-
 %if %cream
 BuildRequires: glite-ce-cream-client-devel
 BuildRequires: glite-lbjp-common-gsoap-plugin-devel
 BuildRequires: glite-ce-cream-utils
 BuildRequires: log4cpp-devel
 BuildRequires: gridsite-devel
+%endif
+
+%if %blahp
+Requires: blahp >= 1.16.1
 %endif
 
 %if %systemd
@@ -206,6 +211,12 @@ Requires: python >= 2.2
 Requires: condor-classads = %{version}-%{release}
 Requires: condor-procd = %{version}-%{release}
 
+%if %blahp
+Requires: blahp >= 1.16.1
+%endif
+%if %glexec
+Requires: glexec
+%endif
 # libcgroup < 0.37 has a bug that invalidates our accounting.
 Requires: libcgroup >= 0.37
 
@@ -433,6 +444,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_ZLIB:BOOL=FALSE \
        -DWITH_POSTGRESQL:BOOL=FALSE \
        -DWANT_CONTRIB:BOOL=ON \
+       -DWITH_PIGEON:BOOL=FALSE \
 %if %plumage
        -DWITH_PLUMAGE:BOOL=TRUE \
 %else
@@ -443,7 +455,6 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %else
        -DWITH_AVIARY:BOOL=FALSE \
 %endif
-       -DWITH_PIGEON:BOOL=FALSE \
 %if %qmf
        -DWITH_TRIGGERD:BOOL=TRUE \
        -DWITH_MANAGEMENT:BOOL=TRUE \
@@ -478,8 +489,6 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %endif
 
 make %{?_smp_mflags}
-#make
-
 
 %install
 # installation happens into a temporary location, this function is
@@ -501,7 +510,7 @@ populate %_sysconfdir/condor %{buildroot}/%{_usr}/lib/condor_ssh_to_job_sshd_con
 # Things in /usr/lib really belong in /usr/share/condor
 populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
 # Except for the shared libs
-populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.so*
+populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.s*
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libcondor_utils*.so
 rm -f %{buildroot}/%{_datadir}/condor/libclassad.a
 
@@ -634,7 +643,7 @@ rm -rf %{buildroot}%{_sbindir}/condor_local_start
 rm -rf %{buildroot}%{_sbindir}/condor_local_stop
 rm -rf %{buildroot}%{_sbindir}/condor_startd_factory
 rm -rf %{buildroot}%{_sbindir}/condor_vm-gahp-vmware
-rm -rf %{buildroot}%{_sbindir}/condor_vm_vmware.pl
+rm -rf %{buildroot}%{_sbindir}/condor_vm_vmwar*
 rm -rf %{buildroot}%{_sbindir}/filelock_midwife
 rm -rf %{buildroot}%{_sbindir}/filelock_undertaker
 rm -rf %{buildroot}%{_sbindir}/install_release
@@ -648,6 +657,7 @@ rm -rf %{buildroot}%{_datadir}/condor/Condor.pm
 rm -rf %{buildroot}%{_datadir}/condor/CondorPersonal.pm
 rm -rf %{buildroot}%{_datadir}/condor/CondorTest.pm
 rm -rf %{buildroot}%{_datadir}/condor/CondorUtils.pm
+rm -rf %{buildroot}%{_datadir}/condor/Chirp.jar
 rm -rf %{buildroot}%{_usrsrc}/chirp/chirp_*
 rm -rf %{buildroot}%{_usrsrc}/startd_factory
 rm -rf %{buildroot}/usr/DOC
@@ -673,6 +683,9 @@ rm -rf %{buildroot}%{_includedir}/write_user_log.h
 rm -rf %{buildroot}%{_libexecdir}/condor/bgp_*
 rm -rf %{buildroot}%{_datadir}/condor/libchirp_client.*
 rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
+# Remove some cluster suite stuff which doesn't work in 
+#rm -f %{buildroot}/etc/examples/cmd_cluster.rb
+#rm -f %{buildroot}/etc/examples/condor.sh
 
 rm %{buildroot}%{_libexecdir}/condor/condor_schedd.init
 
@@ -700,7 +713,6 @@ rm -rf %{buildroot}
 %_initrddir/condor
 %endif
 %dir %_datadir/condor/
-%_datadir/condor/Chirp.jar
 %_datadir/condor/CondorJavaInfo.class
 %_datadir/condor/CondorJavaWrapper.class
 # dep problem in 7.7.3
@@ -737,6 +749,7 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_shared_port
 %_libexecdir/condor/condor_glexec_wrapper
 %_libexecdir/condor/glexec_starter_setup.sh
+%_libexecdir/condor/condor_defrag
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
 %_mandir/man1/condor_chirp.1.gz
@@ -774,12 +787,12 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_version.1.gz
 %_mandir/man1/condor_wait.1.gz
 %_mandir/man1/condor_router_history.1.gz
+%_mandir/man1/condor_continue.1.gz
+%_mandir/man1/condor_suspend.1.gz
 %_mandir/man1/condor_router_q.1.gz
 %_mandir/man1/condor_ssh_to_job.1.gz
 %_mandir/man1/condor_power.1.gz
 %_mandir/man1/condor_glidein.1.gz
-%_mandir/man1/condor_continue.1.gz
-%_mandir/man1/condor_suspend.1.gz
 %_mandir/man1/condor_gather_info.1.gz
 %_mandir/man1/condor_router_rm.1.gz
 # bin/condor is a link for checkpoint, reschedule, vacate
@@ -822,6 +835,7 @@ rm -rf %{buildroot}
 %_bindir/condor_suspend
 %_bindir/condor_test_match
 %_bindir/condor_glidein
+%_bindir/condor_drain
 %_bindir/condor_who
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
@@ -853,10 +867,10 @@ rm -rf %{buildroot}
 %_sbindir/condor_gridmanager
 %_sbindir/condor_gridshell
 %_sbindir/gahp_server
-%_sbindir/grid_monitor.sh
 %_sbindir/grid_monitor
-%_sbindir/nordugrid_gahp
+%_sbindir/grid_monitor.sh
 %_sbindir/remote_gahp
+%_sbindir/nordugrid_gahp
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
@@ -871,7 +885,6 @@ rm -rf %{buildroot}
 %dir %_var/run/condor
 %endif
 
-%_bindir/condor_drain
 %_libexecdir/condor/condor_defrag
 %_datadir/condor/libcondorapi.so
 %_libexecdir/condor/interactive.sub
@@ -914,11 +927,13 @@ rm -rf %{buildroot}
 %_sbindir/aviary_query_server
 %dir %_datadir/condor/aviary
 %_datadir/condor/aviary/jobcontrol.py*
+%_datadir/condor/aviary/jobinventory.py*
 %_datadir/condor/aviary/jobquery.py*
+%_datadir/condor/aviary/locator.py*
 %_datadir/condor/aviary/submissions.py*
+%_datadir/condor/aviary/submission_ids.py*
 %_datadir/condor/aviary/submit.py*
 %_datadir/condor/aviary/setattr.py*
-%_datadir/condor/aviary/jobinventory.py*
 %dir %_datadir/condor/aviary/dag
 %_datadir/condor/aviary/dag/diamond.dag
 %_datadir/condor/aviary/dag/dag-submit.py*
@@ -927,8 +942,6 @@ rm -rf %{buildroot}
 %_datadir/condor/aviary/module/aviary/util.py*
 %_datadir/condor/aviary/module/aviary/https.py*
 %_datadir/condor/aviary/module/aviary/__init__.py*
-%_datadir/condor/aviary/locator.py*
-%_datadir/condor/aviary/submission_ids.py*
 %_datadir/condor/aviary/README
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/aviary
@@ -949,8 +962,8 @@ rm -rf %{buildroot}
 %_var/lib/condor/aviary/services/locator/aviary-common.xsd
 %_var/lib/condor/aviary/services/locator/aviary-locator.wsdl
 %_var/lib/condor/aviary/services/locator/aviary-locator.xsd
-%_var/lib/condor/aviary/services/locator/services.xml
 %_var/lib/condor/aviary/services/locator/libaviary_locator_axis.so
+%_var/lib/condor/aviary/services/locator/services.xml
 %endif
 
 %if %plumage
@@ -983,7 +996,6 @@ rm -rf %{buildroot}
 %doc LICENSE-2.0.txt NOTICE.txt
 %_sbindir/condor_vm-gahp
 #%_sbindir/condor_vm_vmware.pl
-%_sbindir/condor_vm_vmware
 #%_sbindir/condor_vm_xen.sh
 %_libexecdir/condor/libvirt_simple_script.awk
 
@@ -1053,6 +1065,7 @@ rm -rf %{buildroot}
 if [ $1 -eq 1 ] ; then
     # Initial installation 
     /bin/systemctl daemon-reload >/dev/null 2>&1 || :
+    /bin/systemd-tmpfiles --create /etc/tmpfiles.d/%{name}.conf 2>&1 || :
 fi
 
 %preun
