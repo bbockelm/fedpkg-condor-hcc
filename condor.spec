@@ -365,6 +365,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %build
 
 %cmake -DNO_PHONE_HOME:BOOL=TRUE \
+       -D_VERBOSE:BOOL=TRUE \
        -DHAVE_BACKFILL:BOOL=FALSE \
        -DHAVE_BOINC:BOOL=FALSE \
        -DWITH_GSOAP:BOOL=FALSE \
