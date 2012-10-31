@@ -85,19 +85,19 @@ index fc760fa..72ad7b8 100644
 -			// 1) $HOME/.condor/condor_config
 -		struct passwd *pw = getpwuid( geteuid() );
 -		if ( !can_switch_ids() && pw && pw->pw_dir ) {
--			sprintf( locations[0], "%s/.%s/%s", pw->pw_dir, myDistro->Get(),
+-			formatstr( locations[0], "%s/.%s/%s", pw->pw_dir, myDistro->Get(),
 -					 file_name );
 -		}
  			// 2) /etc/condor/condor_config
--		locations[1].sprintf( "/etc/%s/%s", myDistro->Get(), file_name );
-+		locations[0].sprintf( "/etc/%s/%s", myDistro->Get(), file_name );
+-		locations[1].formatstr( "/etc/%s/%s", myDistro->Get(), file_name );
++		locations[0].formatstr( "/etc/%s/%s", myDistro->Get(), file_name );
  			// 3) /usr/local/etc/condor_config (FreeBSD)
--		locations[2].sprintf( "/usr/local/etc/%s", file_name );
-+		locations[1].sprintf( "/usr/local/etc/%s", file_name );
+-		locations[2].formatstr( "/usr/local/etc/%s", file_name );
++		locations[1].formatstr( "/usr/local/etc/%s", file_name );
  		if (tilde) {
  				// 4) ~condor/condor_config
--			locations[3].sprintf( "%s/%s", tilde, file_name );
-+			locations[2].sprintf( "%s/%s", tilde, file_name );
+-			locations[3].formatstr( "%s/%s", tilde, file_name );
++			locations[2].formatstr( "%s/%s", tilde, file_name );
  		}
  
  		int ctr;	

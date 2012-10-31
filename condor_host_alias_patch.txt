@@ -1,0 +1,386 @@
+commit 29f16f3edf7e2346c9677554e735e4abfe61c779
+Author: Dan Bradley <dan@hep.wisc.edu>
+Date:   Tue Sep 18 16:43:14 2012 -0500
+
+    Allow GSI hostname check to work when client is connecting to a CNAME. #1605
+    
+    The CNAME (alias) specified by the client must be stored in the
+    connection address (sinful string) so that it can be used when
+    verifying that the server's DN matches.
+
+diff --git a/src/condor_daemon_client/daemon.cpp b/src/condor_daemon_client/daemon.cpp
+index 59da24b..ebc19f4 100644
+--- a/src/condor_daemon_client/daemon.cpp
++++ b/src/condor_daemon_client/daemon.cpp
+@@ -55,6 +55,7 @@ Daemon::common_init() {
+ 	_is_configured = true;
+ 	_addr = NULL;
+ 	_name = NULL;
++	_alias = NULL;
+ 	_pool = NULL;
+ 	_version = NULL;
+ 	_platform = NULL;
+@@ -200,6 +201,7 @@ Daemon::deepCopy( const Daemon &copy )
+ 		// which is exactly what we want everywhere in this method.
+ 
+ 	New_name( strnewp(copy._name) );
++	New_alias( strnewp(copy._alias) );
+ 	New_hostname( strnewp(copy._hostname) );
+ 	New_full_hostname( strnewp(copy._full_hostname) );
+ 	New_addr( strnewp(copy._addr) );
+@@ -256,6 +258,7 @@ Daemon::~Daemon()
+ 		dprintf( D_HOSTNAME, " --- End of Daemon object info ---\n" );
+ 	}
+ 	if( _name ) delete [] _name;
++	if( _alias ) delete [] _alias;
+ 	if( _pool ) delete [] _pool;
+ 	if( _addr ) delete [] _addr;
+ 	if( _error ) delete [] _error;
+@@ -1109,9 +1112,12 @@ Daemon::getDaemonInfo( AdTypes adtype, bool query_collector )
+ 			} else return false;
+ 			buf = generate_sinful(hostaddr.to_ip_string().Value(), _port);
+ 			dprintf( D_HOSTNAME, "Found IP address and port %s\n", buf.c_str() );
+-			New_addr( strnewp(buf.c_str()) );
+ 			if (fqdn.Length() > 0)
+ 				New_full_hostname(strnewp(fqdn.Value()));
++			if( host ) {
++				New_alias( strnewp(host) );
++			}
++			New_addr( strnewp(buf.c_str()) );
+ 		}
+ 
+ 		if (host) free( host );
+@@ -1134,9 +1140,10 @@ Daemon::getDaemonInfo( AdTypes adtype, bool query_collector )
+ 			newError( CA_LOCATE_FAILED, err_msg.c_str() );
+ 			return false;
+ 		}
+-			// if it worked, we've not got the proper values for the
++			// if it worked, we've now got the proper values for the
+ 			// name (and the full hostname, since that's just the
+ 			// "host part" of the "name"...
++		New_alias( strnewp(get_host_part( _name )) );
+ 		New_name( tmp );
+ 		dprintf( D_HOSTNAME, "Using \"%s\" for name in Daemon object\n",
+ 				 tmp );
+@@ -1475,8 +1482,11 @@ Daemon::findCmDaemon( const char* cm_name )
+ 		sinful.setHost(saddr.to_ip_string().Value());
+ 		dprintf( D_HOSTNAME, "Found IP address and port %s\n",
+ 				 sinful.getSinful() ? sinful.getSinful() : "NULL" );
+-		New_addr( strnewp( sinful.getSinful() ) );
+ 		New_full_hostname(strnewp(fqdn.Value()));
++		if( host ) {
++			New_alias( strnewp(host) );
++		}
++		New_addr( strnewp( sinful.getSinful() ) );
+ 	}
+ 
+ 		// If the pool was set, we want to use _name for that, too. 
+@@ -1991,8 +2001,31 @@ Daemon::New_addr( char* str )
+ 			// This address explicitly specifies that UDP is not supported
+ 			m_has_udp_command_port = false;
+ 		}
++		if( !sinful.getAlias() && _alias ) {
++			size_t len = strlen(_alias);
++				// If _alias is not equivalent to the canonical hostname,
++				// then stash it in the sinful address.  This is important
++				// in cases where we later verify that the certificate
++				// presented by the host we are connecting to matches
++				// the hostname we requested.
++			if( !_full_hostname || (strcmp(_alias,_full_hostname)!=0 && (strncmp(_alias,_full_hostname,len)!=0 || _full_hostname[len]!='.')) )
++			{
++				sinful.setAlias(_alias);
++				delete [] _addr;
++				_addr = strnewp( sinful.getSinful() );
++			}
++		}
+ 	}
+ 
++	if( _addr ) {
++		dprintf( D_HOSTNAME, "Daemon client (%s) address determined: "
++				 "name: \"%s\", pool: \"%s\", alias: \"%s\", addr: \"%s\"\n",
++				 daemonString(_type), 
++				 _name ? _name : "NULL",
++				 _pool ? _pool : "NULL",
++				 _alias ? _alias : "NULL",
++				 _addr ? _addr : "NULL" );
++	}
+ 	return;
+ }
+ 
+@@ -2027,6 +2060,15 @@ Daemon::New_name( char* str )
+ 	return str;
+ }
+ 
++const char*
++Daemon::New_alias( char *str )
++{
++	if( _alias ) {
++		delete [] _alias;
++	} 
++	_alias = str;
++	return str;
++}
+ 
+ char*
+ Daemon::New_pool( char* str )
+diff --git a/src/condor_daemon_client/daemon.h b/src/condor_daemon_client/daemon.h
+index 57fcd8a..8f0e99b 100644
+--- a/src/condor_daemon_client/daemon.h
++++ b/src/condor_daemon_client/daemon.h
+@@ -527,6 +527,7 @@ protected:
+ 	char* _hostname;
+ 	char* _full_hostname;
+ 	char* _addr;
++	char* _alias;
+ 	bool m_has_udp_command_port;
+ 	char* _version;
+ 	char* _platform;
+@@ -700,6 +701,7 @@ protected:
+ 	char* New_platform( char* );
+ 	void New_addr( char* );
+ 	char* New_pool( char* );
++	const char* New_alias( char* );
+ 
+ 		/**
+ 		   Set a string so we know what command we're inside for use
+diff --git a/src/condor_includes/condor_attributes.h b/src/condor_includes/condor_attributes.h
+index 3dc1b87..5c0df6d 100644
+--- a/src/condor_includes/condor_attributes.h
++++ b/src/condor_includes/condor_attributes.h
+@@ -901,6 +901,7 @@ extern const char ATTR_SEC_AUTHENTICATED_USER [];
+ #define ATTR_RETRY  "Retry"
+ #define ATTR_SSH_KEYGEN_ARGS  "SSHKeyGenArgs"
+ #define ATTR_SOCK  "sock"
++#define ATTR_ALIAS "alias"
+ #define ATTR_JOB_AD_INFORMATION_ATTRS  "JobAdInformationAttrs"
+ 
+ #define ATTR_LAST_NEGOTIATION_CYCLE_TIME  "LastNegotiationCycleTime"
+diff --git a/src/condor_includes/sock.h b/src/condor_includes/sock.h
+index ca1b1c8..55f808e 100644
+--- a/src/condor_includes/sock.h
++++ b/src/condor_includes/sock.h
+@@ -279,7 +279,7 @@ public:
+ 	int get_port();
+ 
+     /// sinful address of mypoint() in the form of "<a.b.c.d:pppp>"
+-    char * get_sinful();
++    char const * get_sinful();
+ 
+ 	/// Sinful address for access from outside of our private network.
+ 	/// This takes into account TCP_FORWARDING_HOST.
+@@ -507,10 +507,10 @@ private:
+ 	char _sinful_peer_buf[SINFUL_STRING_BUF_SIZE];
+ 
+ 	// Buffer to hold the sinful address of ourself
+-	char _sinful_self_buf[SINFUL_STRING_BUF_SIZE];
++	std::string _sinful_self_buf;
+ 
+ 	// Buffer to hold the public sinful address of ourself
+-	char _sinful_public_buf[SINFUL_STRING_BUF_SIZE];
++	std::string _sinful_public_buf;
+ 
+ 	// struct to hold state info for do_connect() method
+ 	struct connect_state_struct {
+diff --git a/src/condor_io/cedar_no_ckpt.cpp b/src/condor_io/cedar_no_ckpt.cpp
+index 34df44f..8aaff8b 100644
+--- a/src/condor_io/cedar_no_ckpt.cpp
++++ b/src/condor_io/cedar_no_ckpt.cpp
+@@ -877,12 +877,16 @@ ReliSock::do_shared_port_local_connect( char const *shared_port_id, bool nonbloc
+ 		// to be the standard network interface, because localhost
+ 		// typically does not happen to be allowed in the authorization policy
+ 	const bool use_standard_interface = true;
++	std::string orig_connect_addr = get_connect_addr() ? get_connect_addr() : "";
+ 	if( !connect_socketpair(sock_to_pass,use_standard_interface) ) {
+ 		dprintf(D_ALWAYS,
+ 				"Failed to connect to loopback socket, so failing to connect via local shared port access to %s.\n",
+ 				peer_description());
+ 		return 0;
+ 	}
++		// restore the original connect address, which got overwritten
++		// in connect_socketpair()
++	set_connect_addr(orig_connect_addr.c_str());
+ 
+ 	char const *request_by = "";
+ 	if( !shared_port_client.PassSocket(&sock_to_pass,shared_port_id,request_by) ) {
+@@ -938,10 +942,16 @@ Sock::get_sinful_public()
+ 			addr = addrs.front();
+ 		}
+ 		addr.set_port(get_port());
+-		strncpy(_sinful_public_buf, addr.to_sinful().Value(), 
+-				SINFUL_STRING_BUF_SIZE);
+-		_sinful_public_buf[SINFUL_STRING_BUF_SIZE-1] = '\0';
+-		return _sinful_public_buf;
++		_sinful_public_buf = addr.to_sinful().Value();
++
++		std::string alias;
++		if( param(alias,"HOST_ALIAS") ) {
++			Sinful s(_sinful_public_buf.c_str());
++			s.setAlias(alias.c_str());
++			_sinful_public_buf = s.getSinful();
++		}
++
++		return _sinful_public_buf.c_str();
+ 	}
+ 
+ 	return get_sinful();
+diff --git a/src/condor_io/condor_auth_x509.cpp b/src/condor_io/condor_auth_x509.cpp
+index ad04ddc..98368bf 100644
+--- a/src/condor_io/condor_auth_x509.cpp
++++ b/src/condor_io/condor_auth_x509.cpp
+@@ -31,6 +31,7 @@
+ #include "globus_utils.h"
+ #include "condor_gssapi_openssl.h"
+ #include "ipv6_hostname.h"
++#include "condor_sinful.h"
+ 
+ #if defined(HAVE_EXT_VOMS)
+ extern "C" {
+@@ -873,6 +874,18 @@ bool Condor_Auth_X509::CheckServerName(char const *fqh,char const *ip,ReliSock *
+ 	OM_uint32 major_status = 0;
+ 	OM_uint32 minor_status = 0;
+ 
++	char const *connect_addr = sock->get_connect_addr();
++	std::string alias_buf;
++	if( connect_addr ) {
++		Sinful s(connect_addr);
++		char const *alias = s.getAlias();
++		if( alias ) {
++			dprintf(D_FULLDEBUG,"GSI host check: using host alias %s for %s %s\n",alias,fqh,sock->peer_ip_str());
++			alias_buf = alias;
++			fqh = alias_buf.c_str();
++		}
++	}
++
+ 	formatstr(connect_name,"%s/%s",fqh,sock->peer_ip_str());
+ 
+ 	gss_connect_name_buf.value = strdup(connect_name.c_str());
+@@ -902,11 +915,11 @@ bool Condor_Auth_X509::CheckServerName(char const *fqh,char const *ip,ReliSock *
+ 
+ 	if( !name_equal ) {
+ 		std::string msg;
+-		formatstr(msg,"We are trying to connect to a daemon with certificate DN (%s), but the host name in the certificate does not match any DNS name associated with the host to which we are connecting (host name is '%s', IP is '%s', Condor connection address is '%s').  Check that DNS is correctly configured.  If you wish to use a daemon certificate that does not match the daemon's host name, make GSI_SKIP_HOST_CHECK_CERT_REGEX match the DN, or disable all host name checks by setting GSI_SKIP_HOST_CHECK=true or by defining GSI_DAEMON_NAME.\n",
++		formatstr(msg,"We are trying to connect to a daemon with certificate DN (%s), but the host name in the certificate does not match any DNS name associated with the host to which we are connecting (host name is '%s', IP is '%s', Condor connection address is '%s').  Check that DNS is correctly configured.  If the certificate is for a DNS alias, configure HOST_ALIAS in the daemon's configuration.  If you wish to use a daemon certificate that does not match the daemon's host name, make GSI_SKIP_HOST_CHECK_CERT_REGEX match the DN, or disable all host name checks by setting GSI_SKIP_HOST_CHECK=true or by defining GSI_DAEMON_NAME.\n",
+ 				server_dn,
+ 				fqh,
+ 				ip,
+-				sock->peer_description() );
++				connect_addr ? connect_addr : sock->peer_description() );
+ 		errstack->push("GSI", GSI_ERR_DNS_CHECK_ERROR, msg.c_str());
+ 	}
+ 	return name_equal != 0;
+diff --git a/src/condor_io/shared_port_endpoint.cpp b/src/condor_io/shared_port_endpoint.cpp
+index 18e141c..a26a49f 100644
+--- a/src/condor_io/shared_port_endpoint.cpp
++++ b/src/condor_io/shared_port_endpoint.cpp
+@@ -809,6 +809,10 @@ SharedPortEndpoint::GetMyLocalAddress()
+ 		sinful.setPort("0");
+ 		sinful.setHost(my_ip_string());
+ 		sinful.setSharedPortID( m_local_id.Value() );
++		std::string alias;
++		if( param(alias,"HOST_ALIAS") ) {
++			sinful.setAlias(alias.c_str());
++		}
+ 		m_local_addr = sinful.getSinful();
+ 	}
+ 	return m_local_addr.Value();
+diff --git a/src/condor_io/sock.cpp b/src/condor_io/sock.cpp
+index c4dcb0b..934b189 100644
+--- a/src/condor_io/sock.cpp
++++ b/src/condor_io/sock.cpp
+@@ -35,6 +35,7 @@
+ #include "authentication.h"
+ #include "condor_sockfunc.h"
+ #include "condor_ipv6.h"
++#include "condor_config.h"
+ 
+ #ifdef HAVE_EXT_OPENSSL
+ #include "condor_crypt_blowfish.h"
+@@ -1806,8 +1807,8 @@ Sock::addr_changed()
+     // either the peer's address or our address change, zap them all
+     _my_ip_buf[0] = '\0';
+     _peer_ip_buf[0] = '\0';
+-    _sinful_self_buf[0] = '\0';
+-    _sinful_public_buf[0] = '\0';
++    _sinful_self_buf.clear();
++    _sinful_public_buf.clear();
+     _sinful_peer_buf[0] = '\0';
+ }
+ 
+@@ -1983,18 +1984,25 @@ Sock::my_ip_str()
+ 	return _my_ip_buf;
+ }
+ 
+-char *
++char const *
+ Sock::get_sinful()
+-{       
+-    if( !_sinful_self_buf[0] ) {
++{
++    if( _sinful_self_buf.empty() ) {
+ 		condor_sockaddr addr;
+ 		int ret = condor_getsockname_ex(_sock, addr);
+ 		if (ret == 0) {
+-			MyString sinful_self = addr.to_sinful();
+-			strcpy(_sinful_self_buf, sinful_self.Value());
+-    }
++			_sinful_self_buf = addr.to_sinful();
++
++			std::string alias;
++			if( param(alias,"HOST_ALIAS") ) {
++				Sinful s(_sinful_self_buf.c_str());
++				s.setAlias(alias.c_str());
++				_sinful_self_buf = s.getSinful();
++			}
++
++		}
+ 	}
+-	return _sinful_self_buf;
++	return _sinful_self_buf.c_str();
+ }
+ 
+ char *
+diff --git a/src/condor_utils/condor_sinful.cpp b/src/condor_utils/condor_sinful.cpp
+index 9eab941..5bd1532 100644
+--- a/src/condor_utils/condor_sinful.cpp
++++ b/src/condor_utils/condor_sinful.cpp
+@@ -292,6 +292,18 @@ Sinful::getSharedPortID() const
+ }
+ 
+ void
++Sinful::setAlias(char const *alias)
++{
++	setParam(ATTR_ALIAS,alias);
++}
++
++char const *
++Sinful::getAlias() const
++{
++	return getParam(ATTR_ALIAS);
++}
++
++void
+ Sinful::setPrivateAddr(char const *addr)
+ {
+ 	setParam("PrivAddr",addr);
+diff --git a/src/condor_utils/condor_sinful.h b/src/condor_utils/condor_sinful.h
+index 5198b9f..8d8307c 100644
+--- a/src/condor_utils/condor_sinful.h
++++ b/src/condor_utils/condor_sinful.h
+@@ -69,6 +69,9 @@ class Sinful {
+ 	// id of SharedPortEndpoint (i.e. basename of named socket)
+ 	char const *getSharedPortID() const;
+ 	void setSharedPortID(char const *contact);
++	// hostname alias
++	char const *getAlias() const;
++	void setAlias(char const *alias);
+ 	// is the noUDP flag set in this address?
+ 	bool noUDP() const;
+ 	void setNoUDP(bool flag);
+@@ -91,6 +94,7 @@ class Sinful {
+ 	std::string m_sinful; // the sinful string "<host:port?params>"
+ 	std::string m_host;
+ 	std::string m_port;
++	std::string m_alias;
+ 	std::map<std::string,std::string> m_params; // key value pairs from params
+ 	bool m_valid;
+ 

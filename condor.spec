@@ -38,12 +38,17 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev ecc9193
+%define git_rev b714b0e
+
+%if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
+%{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
+%{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(1))")}
+%endif
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.9.1
-%define condor_base_release 0.11
+Version: 7.9.2
+%define condor_base_release 0.2
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
 %else
@@ -113,14 +118,17 @@ Patch2: hcc_config.patch
 Patch3: wso2-axis2.patch
 Patch4: condor_pid_namespaces_v7.patch
 Patch5: condor-gahp.patch
-Patch6: cgahp_scaling.patch
-Patch7: condor-1605-v2.patch
+#Patch6: cgahp_scaling.patch
+Patch7: condor-1605-v3.patch
+#Patch7: condor_host_alias_patch.txt
 Patch8: lcmaps_env_in_init_script.patch
 # See gt3158
 Patch9: 0001-Apply-the-user-s-condor_config-last-rather-than-firs.patch
 Patch11: condor_oom_v3.patch
 # From ZKM
-Patch12: zkm-782.patch
+#Patch12: zkm-782.patch
+# Add syslog support to dprintf.
+Patch12: dprintf_syslog.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -388,6 +396,23 @@ The cream_gahp enables the Condor grid universe to communicate with a remote
 CREAM server.
 %endif
 
+#######################
+%package bosco
+Summary: BOSCO, a Condor overlay system for managing jobs at remote clusters
+Url: http://bosco.opensciencegrid.org
+Group: Applications/System
+Requires: %name = %version-%release
+
+%description bosco
+BOSCO allows a locally-installed Condor to submit jobs to remote clusters,
+using SSH as a transit mechanism.  It is designed for cases where the remote
+cluster is using a different batch system such as PBS, SGE, LSF, or another
+Condor system.
+
+BOSCO provides an overlay system so the remote clusters appear to be a Condor
+cluster.  This allows the user to run their workflows using Condor tools across
+multiple clusters.
+
 %pre
 getent group condor >/dev/null || groupadd -r condor
 getent passwd condor >/dev/null || \
@@ -410,11 +435,12 @@ exit 0
 %patch3 -p0
 %patch4 -p1
 %patch5 -p1
-%patch6 -p1
+#%patch6 -p1
 %patch7 -p1
 %patch9 -p1
 #%patch10 -p1
 %patch11 -p1
+#%patch12 -p1
 %patch12 -p1
 
 %if %systemd
@@ -689,6 +715,14 @@ rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
 
 rm %{buildroot}%{_libexecdir}/condor/condor_schedd.init
 
+# Install BOSCO
+mkdir -p %{buildroot}%{python_sitelib}
+mv %{buildroot}%{_libexecdir}/condor/campus_factory/python-lib/GlideinWMS %{buildroot}%{python_sitelib}
+mv %{buildroot}%{_libexecdir}/condor/campus_factory/python-lib/campus_factory %{buildroot}%{python_sitelib}
+mv %{buildroot}%{_libexecdir}/condor/campus_factory/share/condor/condor_config.factory %{buildroot}%{_sysconfdir}/condor/config.d/60-campus_factory.config
+mv %{buildroot}%{_libexecdir}/condor/campus_factory/etc/campus_factory.conf %{buildroot}%{_sysconfdir}/condor/
+mv %{buildroot}%{_libexecdir}/condor/campus_factory/share %{buildroot}%{_datadir}/condor/campus_factory
+
 %clean
 rm -rf %{buildroot}
 
@@ -719,7 +753,7 @@ rm -rf %{buildroot}
 #%_datadir/condor/Condor.pm
 %_datadir/condor/scimark2lib.jar
 %dir %_sysconfdir/condor/config.d/
-%_sysconfdir/condor/config.d/00personal_condor.config
+%config(noreplace) %_sysconfdir/condor/config.d/00personal_condor.config
 %_sysconfdir/condor/condor_ssh_to_job_sshd_config_template
 %dir %_libexecdir/condor/
 %_libexecdir/condor/condor_chirp
@@ -885,7 +919,7 @@ rm -rf %{buildroot}
 %dir %_var/run/condor
 %endif
 
-%_libexecdir/condor/condor_defrag
+%_libexecdir/condor/accountant_log_fixer
 %_datadir/condor/libcondorapi.so
 %_libexecdir/condor/interactive.sub
 
@@ -902,7 +936,7 @@ rm -rf %{buildroot}
 %files qmf
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
-%_sysconfdir/condor/config.d/60condor-qmf.config
+%config(noreplace) %_sysconfdir/condor/config.d/60condor-qmf.config
 %dir %_libdir/condor/plugins
 %_libdir/condor/plugins/MgmtCollectorPlugin-plugin.so
 %_libdir/condor/plugins/MgmtMasterPlugin-plugin.so
@@ -1060,6 +1094,25 @@ rm -rf %{buildroot}
 %_sbindir/cream_gahp
 %endif
 
+%files bosco
+%defattr(-,root,root,-)
+%config(noreplace) %_sysconfdir/condor/campus_factory.conf
+%config(noreplace) %_sysconfdir/condor/config.d/60-campus_factory.config
+%_libexecdir/condor/shellselector
+%_libexecdir/condor/campus_factory
+%_sbindir/bosco_install
+%_sbindir/campus_factory
+%_sbindir/condor_ft-gahp
+%_sbindir/runfactory
+%_bindir/bosco_cluster
+%_bindir/bosco_ssh_start
+%_bindir/bosco_start
+%_bindir/bosco_stop
+%_bindir/bosco_uninstall
+%_datadir/condor/campus_factory
+%{python_sitelib}/GlideinWMS
+%{python_sitelib}/campus_factory
+
 %if %systemd
 %post
 if [ $1 -eq 1 ] ; then
@@ -1113,6 +1166,21 @@ fi
 %endif
 
 %changelog
+* Tue Oct 30 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.2-0.2.b714b0e.git
+- Re-up to the latest master.
+- Add support for syslog.
+
+* Thu Oct 11 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.14.b135441.git
+- Re-up to the latest master.
+- Split out a separate package for BOSCO.
+
+* Tue Sep 25 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.13.c7df613.git
+- Rebuild to re-enable blahp.
+
+* Mon Sep 24 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.12.c7df613.git
+- Update to capture the latest security fixes.
+- CGAHP scalability fixes have been upstreamed.
+
 * Wed Aug 15 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.1-0.11.ecc9193.git
 - Fixes to the JobRouter configuration.
 
