@@ -19,16 +19,3 @@ index 48c6b15..b0a44d8 100644
  	// For amazon ec2 ca authentication
  	tmp_char = param("SOAP_SSL_CA_FILE");
  	if( tmp_char ) {
-diff --git a/src/condor_gridmanager/infnbatchjob.cpp b/src/condor_gridmanager/infnbatchjob.cpp
-index b76bc4f..f6751a1 100644
---- a/src/condor_gridmanager/infnbatchjob.cpp
-+++ b/src/condor_gridmanager/infnbatchjob.cpp
-@@ -224,7 +224,7 @@ INFNBatchJob::INFNBatchJob( ClassAd *classad )
- 	free( gahp_path );
- 
- 	myResource = INFNBatchResource::FindOrCreateResource( batchType,
--														  gahp_args.GetArg(0) );
-+														  (gahp_args.Count() > 0) ? gahp_args.GetArg(0) : "localhost" );
- 	myResource->RegisterJob( this );
- 	if ( remoteJobId ) {
- 		myResource->AlreadySubmitted( this );
