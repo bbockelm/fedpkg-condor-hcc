@@ -1,14 +1,14 @@
-From 9cdc4723117927ecac26cc1ceca977063bf5de77 Mon Sep 17 00:00:00 2001
+From 47a7bb8fb64885d46c995a18d2c4601fbf9609f9 Mon Sep 17 00:00:00 2001
 From: Brian Bockelman <bbockelm@cse.unl.edu>
 Date: Tue, 24 Jul 2012 09:40:06 -0500
 Subject: [PATCH] Apply the user's condor_config last, rather than first.
 
 ---
- src/condor_utils/condor_config.cpp |   57 +++++++++++++++++++++++++++++-------
- 1 files changed, 46 insertions(+), 11 deletions(-)
+ src/condor_utils/condor_config.cpp |   55 +++++++++++++++++++++++++++++------
+ 1 files changed, 45 insertions(+), 10 deletions(-)
 
 diff --git a/src/condor_utils/condor_config.cpp b/src/condor_utils/condor_config.cpp
-index fc760fa..72ad7b8 100644
+index ef35572..455bdfa 100644
 --- a/src/condor_utils/condor_config.cpp
 +++ b/src/condor_utils/condor_config.cpp
 @@ -110,6 +110,7 @@ void check_params();
@@ -19,12 +19,10 @@ index fc760fa..72ad7b8 100644
  
  // Global variables
  BUCKET	*ConfigTab[TABLESIZE];
-@@ -708,7 +709,15 @@ real_config(char* host, int wantsQuiet, bool wantExtraInfo)
-     if ( param_boolean("NET_REMAP_ENABLE", false) ) {
-         condor_net_remap_config();
-     }
--			
-+
+@@ -654,6 +655,14 @@ real_config(char* host, int wantsQuiet, bool wantExtraInfo)
+ 	if(dirlist) { free(dirlist); dirlist = NULL; }
+ 	if(newdirlist) { free(newdirlist); newdirlist = NULL; }
+ 
 +		// Now, insert overrides from the user config file
 +	std::string file_location;
 +	if (find_user_file(file_location))
@@ -36,7 +34,7 @@ index fc760fa..72ad7b8 100644
  		// Now, insert any macros defined in the environment.
  	char **my_environ = GetEnviron();
  	for( int i = 0; my_environ[i]; i++ ) {
-@@ -1051,6 +1060,38 @@ find_global()
+@@ -996,6 +1005,38 @@ find_global()
  }
  
  
@@ -75,7 +73,7 @@ index fc760fa..72ad7b8 100644
  // Find location of specified file
  char*
  find_file(const char *env_name, const char *file_name)
-@@ -1107,21 +1148,15 @@ find_file(const char *env_name, const char *file_name)
+@@ -1052,21 +1093,15 @@ find_file(const char *env_name, const char *file_name)
  	if (!config_source) {
  			// List of condor_config file locations we'll try to open.
  			// As soon as we find one, we'll stop looking.

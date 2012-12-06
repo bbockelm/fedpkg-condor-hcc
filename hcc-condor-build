@@ -1,0 +1,93 @@
+#!/usr/bin/python
+
+import os
+import sys
+import shutil
+import optparse
+
+def prep_dirs(base_dir):
+    for i in ["BUILD", "INSTALL", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
+        new_dir = os.path.join(base_dir, i)
+        if not os.path.exists(new_dir):
+            os.makedirs(new_dir)
+
+def prep_source(base_dir):
+    source_dir = os.path.join(base_dir, "_build", "SOURCES")
+    for file in os.listdir(base_dir):
+        if file == "_build":
+            continue
+        full_name = os.path.join(base_dir, file)
+        if not os.path.isfile(full_name):
+            continue
+        shutil.copy(full_name, os.path.join(source_dir, file))
+
+def prepare_condor_tarball(build_dir, source_dir, branch):
+    cur_dir = os.getcwd()
+    tarball_dir = os.path.join(build_dir, "SOURCES")
+    fd = open(os.path.join(tarball_dir, "condor.tar.gz"), "w")
+    fdnum = fd.fileno()
+    try:
+        os.chdir(source_dir)
+        pid = os.fork()
+        if not pid:
+            try:
+                os.dup2(fdnum, 1)
+                os.execvp("/bin/sh", ["sh", "-c", "git archive %s | gzip -7" % branch])
+            finally:
+                os._exit(1)
+        else:
+            (pid, status) = os.waitpid(pid, 0)
+            if status:
+                raise Exception("git archive failed")
+    finally:
+        os.chdir(cur_dir)
+
+def get_rpmbuild_defines(results_dir):
+    results_dir = os.path.abspath(results_dir)
+    defines = []
+    defines += ["--define=_topdir %s" % results_dir]
+    return defines
+
+def parse_opts():
+    parser = optparse.OptionParser()
+    parser.add_option("-s", "--source-dir", help="Location of the Condor git repo clone.", dest="source_dir", default="~/projects/condor")
+    parser.add_option("-b", "--branch", help="Name of the git branch to use for the condor build.", dest="branch", default="master")
+
+    opts, args = parser.parse_args()
+
+    opts.source_dir = os.path.expanduser(opts.source_dir)
+
+    return args, opts
+
+def main():
+
+    args, opts = parse_opts()
+
+    if len(args) != 2:
+        print "Usage: hcc_make_condor <action> <directory>"
+        print "Valid commands are 'build', 'prep', and 'srpm'"
+        print "<directory> should point at the fedpkg-condor-hcc clone."
+        return 1
+
+    build_dir = os.path.join(args[1], "_build")
+
+    prep_dirs(build_dir)
+    defines = get_rpmbuild_defines(build_dir)
+    prep_source(args[1])
+
+    prepare_condor_tarball(build_dir, opts.source_dir, opts.branch)
+
+    if args[0] == 'build':
+        os.execvp("rpmbuild", ["rpmbuild"] + defines + ["-ba", "condor.spec"])
+    elif args[0] == 'srpm':
+        os.execvp("rpmbuild", ["rpmbuild"] + defines + ["-bs", "condor.spec"])
+    elif args[0] == "prep":
+        os.execvp("rpmbuild", ["rpmbuild"] + defines + ["-bp", "condor.spec"])
+    else:
+        print "Unknown action: %s" % args[0]
+
+    return 1
+        
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -1,4 +1,4 @@
-%define tarball_version 7.9.1
+%define tarball_version 7.9.3
 
 %define _default_patch_fuzz 2
 
@@ -31,7 +31,7 @@
 # Things not turned on, or don't have Fedora packages yet
 %define blahp 1
 %define glexec 1
-%define cream 1
+%define cream 0
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
@@ -47,7 +47,7 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.9.2
+Version: %{tarball_version}
 %define condor_base_release 0.4
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
@@ -493,6 +493,8 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %endif
 %if %cream
        -DWITH_CREAM:BOOL=TRUE \
+%else
+       -DWITH_CREAM:BOOL=FALSE \
 %endif
 %if %glexec
        -DWANT_GLEXEC:BOOL=TRUE \
