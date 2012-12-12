@@ -38,7 +38,7 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev ce12f50
+%define git_rev 49e132e
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -48,7 +48,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: %{tarball_version}
-%define condor_base_release 0.6
+%define condor_base_release 0.8
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
 %else
@@ -127,7 +127,6 @@ Patch9: 0001-Apply-the-user-s-condor_config-last-rather-than-firs.patch
 Patch11: condor_oom_v3.patch
 # From ZKM
 #Patch12: zkm-782.patch
-Patch12: cream_sl6_build.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -439,7 +438,6 @@ exit 0
 %patch9 -p1
 #%patch10 -p1
 %patch11 -p1
-%patch12 -p1
 
 %if %systemd
 cp %{SOURCE2} %{name}-tmpfiles.conf
