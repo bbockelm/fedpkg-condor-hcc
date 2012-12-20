@@ -38,7 +38,7 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 4aac286
+%define git_rev acb8b63
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -48,7 +48,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: %{tarball_version}
-%define condor_base_release 0.10
+%define condor_base_release 0.13
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git.lark
 %else
@@ -431,10 +431,10 @@ exit 0
 %patch1 -p1
 %patch2 -p1
 %patch3 -p0
-%patch4 -p1
+#%patch4 -p1
 %patch5 -p1
 #%patch6 -p1
-%patch7 -p1
+#%patch7 -p1
 %patch9 -p1
 #%patch10 -p1
 %patch11 -p1
@@ -509,8 +509,9 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %endif
        -DWITH_GLOBUS:BOOL=TRUE \
 %if %cgroups
-       -DLIBCGROUP_FOUND_SEARCH_cgroup=/%{_lib}/libcgroup.so.1
+       -DLIBCGROUP_FOUND_SEARCH_cgroup=/%{_lib}/libcgroup.so.1 \
 %endif
+       -DWITH_LARK:BOOL=TRUE
 
 make %{?_smp_mflags}
 
@@ -920,6 +921,10 @@ rm -rf %{buildroot}
 %_libexecdir/condor/accountant_log_fixer
 %_datadir/condor/libcondorapi.so
 %_libexecdir/condor/interactive.sub
+
+# Lark files.
+%_libdir/condor/plugins/lark-plugin.so
+%_libexecdir/condor/lark_network_namespace_tester
 
 %files procd
 %_sbindir/condor_procd
