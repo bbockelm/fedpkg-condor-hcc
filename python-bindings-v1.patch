@@ -1,0 +1,2058 @@
+diff --git a/.gitignore b/.gitignore
+index 8fe6157..5a569ca 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -209,3 +209,4 @@ src/safefile/stamp-h1
+ src/safefile/stamp-h2
+ src/safefile/safe_id_range_list.h.in.tmp
+ src/safefile/safe_id_range_list.h.tmp_out
++src/condor_contrib/python-bindings/tests_tmp
+diff --git a/externals/bundles/boost/1.49.0/CMakeLists.txt b/externals/bundles/boost/1.49.0/CMakeLists.txt
+index 8608ee6..dcba24b 100644
+--- a/externals/bundles/boost/1.49.0/CMakeLists.txt
++++ b/externals/bundles/boost/1.49.0/CMakeLists.txt
+@@ -28,6 +28,9 @@ if (NOT WINDOWS)
+ 	if (BUILD_TESTING) 
+ 	  set (BOOST_COMPONENTS unit_test_framework ${BOOST_COMPONENTS})
+ 	endif()
++        if (WITH_PYTHON_BINDINGS)
++          set (BOOST_COMPONENTS python ${BOOST_COMPONENTS})
++        endif()
+ 
+     endif()
+ 
+@@ -104,6 +107,9 @@ if (NOT PROPER) # AND (NOT Boost_FOUND OR SYSTEM_NOT_UP_TO_SNUFF) )
+ 	condor_pre_external( BOOST ${BOOST_FILENAME}-p2 "lib;${INCLUDE_LOC}" "done")
+ 
+ 	set(BOOST_MIN_BUILD_DEP --with-thread --with-test)
++        if (WITH_PYTHON_BINDINGS)
++          set(BOOST_MIN_BUILD_DEP --with-python)
++        endif()
+ 	set(BOOST_PATCH echo "nothing")
+ 	set(BOOST_INSTALL echo "nothing")
+ 	unset(BOOST_INCLUDE)
+diff --git a/src/condor_contrib/CMakeLists.txt b/src/condor_contrib/CMakeLists.txt
+index 52f14c0..41b9002 100644
+--- a/src/condor_contrib/CMakeLists.txt
++++ b/src/condor_contrib/CMakeLists.txt
+@@ -32,4 +32,5 @@ else(WANT_CONTRIB)
+   dprint("skipping contrib modules")
+   add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/campus_factory")
+   add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/bosco")
++  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/python-bindings")
+ endif(WANT_CONTRIB)
+diff --git a/src/condor_contrib/python-bindings/CMakeLists.txt b/src/condor_contrib/python-bindings/CMakeLists.txt
+new file mode 100644
+index 0000000..50d8a29
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/CMakeLists.txt
+@@ -0,0 +1,26 @@
++
++option(WITH_PYTHON_BINDINGS "Support for HTCondor python bindings" OFF)
++
++if ( WITH_PYTHON_BINDINGS )
++
++  set ( CMAKE_LIBRARY_PATH_ORIG ${CMAKE_LIBRARY_PATH} )
++  set ( CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} /usr/lib64 )
++  find_package(PythonLibs REQUIRED)
++  set ( CMAKE_LIBRARY_PATH CMAKE_LIBRARY_PATH_ORIG)
++
++  include_directories(${PYTHON_INCLUDE_DIRS})
++
++  condor_shared_lib( pyclassad classad.cpp classad_wrapper.h exprtree_wrapper.h )
++  target_link_libraries( pyclassad classad ${PYTHON_LIBRARIES} -lboost_python )
++
++  condor_shared_lib( classad_module classad_module.cpp )
++  target_link_libraries( classad_module pyclassad -lboost_python ${PYTHON_LIBRARIES} )
++  set_target_properties(classad_module PROPERTIES PREFIX "" OUTPUT_NAME classad )
++
++  set_source_files_properties(dc_tool.cpp schedd.cpp PROPERTIES COMPILE_FLAGS -Wno-strict-aliasing)
++  condor_shared_lib( condor condor.cpp collector.cpp config.cpp daemon_and_ad_types.cpp dc_tool.cpp export_headers.h old_boost.h schedd.cpp secman.cpp )
++  target_link_libraries( condor pyclassad condor_utils -lboost_python ${PYTHON_LIBRARIES} )
++  set_target_properties( condor PROPERTIES PREFIX "" )
++
++endif ( WITH_PYTHON_BINDINGS )
++
+diff --git a/src/condor_contrib/python-bindings/classad.cpp b/src/condor_contrib/python-bindings/classad.cpp
+new file mode 100644
+index 0000000..4c2db18
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/classad.cpp
+@@ -0,0 +1,341 @@
++
++#include <string>
++
++#include <classad/source.h>
++#include <classad/sink.h>
++
++#include "classad_wrapper.h"
++#include "exprtree_wrapper.h"
++
++
++ExprTreeHolder::ExprTreeHolder(const std::string &str)
++    : m_expr(NULL), m_owns(true)
++{
++    classad::ClassAdParser parser;
++    classad::ExprTree *expr = NULL;
++    if (!parser.ParseExpression(str, expr))
++    {
++        PyErr_SetString(PyExc_SyntaxError, "Unable to parse string into a ClassAd.");
++        boost::python::throw_error_already_set();
++    }
++    m_expr = expr;
++}
++
++
++ExprTreeHolder::ExprTreeHolder(classad::ExprTree *expr)
++     : m_expr(expr), m_owns(false)
++{}
++
++
++ExprTreeHolder::~ExprTreeHolder()
++{
++    if (m_owns && m_expr) delete m_expr;
++}
++
++
++boost::python::object ExprTreeHolder::Evaluate() const
++{
++    if (!m_expr)
++    {
++            PyErr_SetString(PyExc_RuntimeError, "Cannot operate on an invalid ExprTree");
++            boost::python::throw_error_already_set();
++    }
++    classad::Value value;
++    if (!m_expr->Evaluate(value)) {
++            PyErr_SetString(PyExc_SyntaxError, "Unable to evaluate expression");
++            boost::python::throw_error_already_set();
++    }
++    boost::python::object result;
++    std::string strvalue;
++    long long intvalue;
++    bool boolvalue;
++    double realvalue;
++    PyObject* obj;
++    switch (value.GetType())
++    {
++    case classad::Value::BOOLEAN_VALUE:
++        value.IsBooleanValue(boolvalue);
++        obj = boolvalue ? Py_True : Py_False;
++        result = boost::python::object(boost::python::handle<>(boost::python::borrowed(obj)));
++        break;
++    case classad::Value::STRING_VALUE:
++        value.IsStringValue(strvalue);
++        result = boost::python::str(strvalue);
++        break;
++    case classad::Value::ABSOLUTE_TIME_VALUE:
++    case classad::Value::INTEGER_VALUE:
++        value.IsIntegerValue(intvalue);
++        result = boost::python::long_(intvalue);
++        break;
++    case classad::Value::RELATIVE_TIME_VALUE:
++    case classad::Value::REAL_VALUE:
++        value.IsRealValue(realvalue);
++        result = boost::python::object(realvalue);
++        break;
++    case classad::Value::ERROR_VALUE:
++        result = boost::python::object(classad::Value::ERROR_VALUE);
++        break;
++    case classad::Value::UNDEFINED_VALUE:
++        result = boost::python::object(classad::Value::UNDEFINED_VALUE);
++        break;
++    default:
++        PyErr_SetString(PyExc_TypeError, "Unknown ClassAd value type.");
++        boost::python::throw_error_already_set();
++    }
++    return result;
++}
++
++
++std::string ExprTreeHolder::toRepr()
++{
++    if (!m_expr)
++    {
++        PyErr_SetString(PyExc_RuntimeError, "Cannot operate on an invalid ExprTree");
++        boost::python::throw_error_already_set();
++    }
++    classad::ClassAdUnParser up;
++    std::string ad_str;
++    up.Unparse(ad_str, m_expr);
++    return ad_str;
++}
++
++
++std::string ExprTreeHolder::toString()
++{
++    if (!m_expr)
++    {
++        PyErr_SetString(PyExc_RuntimeError, "Cannot operate on an invalid ExprTree");
++        boost::python::throw_error_already_set();
++    }
++    classad::PrettyPrint pp;
++    std::string ad_str;
++    pp.Unparse(ad_str, m_expr);
++    return ad_str;
++}
++
++
++classad::ExprTree *ExprTreeHolder::get()
++{
++    if (!m_expr)
++    {
++        PyErr_SetString(PyExc_RuntimeError, "Cannot operate on an invalid ExprTree");
++        boost::python::throw_error_already_set();
++    }
++    return m_expr->Copy();
++}
++
++AttrPairToSecond::result_type AttrPairToSecond::operator()(AttrPairToSecond::argument_type p) const
++{
++    ExprTreeHolder holder(p.second);
++    if (p.second->GetKind() == classad::ExprTree::LITERAL_NODE)
++    {
++        return holder.Evaluate();
++    }
++    boost::python::object result(holder);
++    return result;
++} 
++
++
++AttrPair::result_type AttrPair::operator()(AttrPair::argument_type p) const
++{
++    ExprTreeHolder holder(p.second);
++    boost::python::object result(holder);
++    if (p.second->GetKind() == classad::ExprTree::LITERAL_NODE)
++    {
++        result = holder.Evaluate();
++    }
++    return boost::python::make_tuple<std::string, boost::python::object>(p.first, result);
++}
++
++
++boost::python::object ClassAdWrapper::LookupWrap(const std::string &attr) const
++{
++    classad::ExprTree * expr = Lookup(attr);
++    if (!expr)
++    {
++        PyErr_SetString(PyExc_KeyError, attr.c_str());
++        boost::python::throw_error_already_set();
++    }
++    if (expr->GetKind() == classad::ExprTree::LITERAL_NODE) return EvaluateAttrObject(attr);
++    ExprTreeHolder holder(expr);
++    boost::python::object result(holder);
++    return result;
++}
++
++boost::python::object ClassAdWrapper::LookupExpr(const std::string &attr) const
++{
++    classad::ExprTree * expr = Lookup(attr);
++    if (!expr)
++    {
++        PyErr_SetString(PyExc_KeyError, attr.c_str());
++        boost::python::throw_error_already_set();
++    }
++    ExprTreeHolder holder(expr);
++    boost::python::object result(holder);
++    return result;
++}
++
++boost::python::object ClassAdWrapper::EvaluateAttrObject(const std::string &attr) const
++{
++    classad::ExprTree *expr;
++    if (!(expr = Lookup(attr))) {
++        PyErr_SetString(PyExc_KeyError, attr.c_str());
++        boost::python::throw_error_already_set();
++    }
++    ExprTreeHolder holder(expr);
++    return holder.Evaluate();
++}
++
++
++void ClassAdWrapper::InsertAttrObject( const std::string &attr, boost::python::object value)
++{
++    boost::python::extract<ExprTreeHolder&> expr_obj(value);
++    if (expr_obj.check())
++    {
++        classad::ExprTree *expr = expr_obj().get();
++        Insert(attr, expr);
++        return;
++    }
++    boost::python::extract<classad::Value::ValueType> value_enum_obj(value);
++    if (value_enum_obj.check())
++    {
++        classad::Value::ValueType value_enum = value_enum_obj();
++        classad::Value classad_value;
++        if (value_enum == classad::Value::ERROR_VALUE)
++        {
++            classad_value.SetErrorValue();
++            classad::ExprTree *lit = classad::Literal::MakeLiteral(classad_value);
++            Insert(attr, lit);
++        }
++        else if (value_enum == classad::Value::UNDEFINED_VALUE)
++        {
++            classad_value.SetUndefinedValue();
++            classad::ExprTree *lit = classad::Literal::MakeLiteral(classad_value);
++            if (!Insert(attr, lit))
++            {
++                PyErr_SetString(PyExc_AttributeError, attr.c_str());
++                boost::python::throw_error_already_set();
++            }
++        }
++        return;
++    }
++    if (PyString_Check(value.ptr()))
++    {
++        std::string cppvalue = boost::python::extract<std::string>(value);
++        if (!InsertAttr(attr, cppvalue))
++        {
++            PyErr_SetString(PyExc_AttributeError, attr.c_str());
++            boost::python::throw_error_already_set();
++        }
++        return;
++    }
++    if (PyLong_Check(value.ptr()))
++    {
++        long long cppvalue = boost::python::extract<long long>(value);
++        if (!InsertAttr(attr, cppvalue))
++        {
++            PyErr_SetString(PyExc_AttributeError, attr.c_str());
++            boost::python::throw_error_already_set();
++        }
++        return;
++    }
++    if (PyInt_Check(value.ptr()))
++    {
++        long int cppvalue = boost::python::extract<long int>(value);
++        if (!InsertAttr(attr, cppvalue))
++        {
++            PyErr_SetString(PyExc_AttributeError, attr.c_str());
++            boost::python::throw_error_already_set();
++        }
++        return;
++    }
++    if (PyFloat_Check(value.ptr()))
++    {
++        double cppvalue = boost::python::extract<double>(value);
++        if (!InsertAttr(attr, cppvalue))
++        {
++            PyErr_SetString(PyExc_AttributeError, attr.c_str());
++            boost::python::throw_error_already_set();
++        }
++        return;
++    }
++    PyErr_SetString(PyExc_TypeError, "Unknown ClassAd value type.");
++    boost::python::throw_error_already_set();
++}
++
++
++std::string ClassAdWrapper::toRepr()
++{
++    classad::ClassAdUnParser up;
++    std::string ad_str;
++    up.Unparse(ad_str, this);
++    return ad_str;
++}
++
++
++std::string ClassAdWrapper::toString()
++{
++    classad::PrettyPrint pp;
++    std::string ad_str;
++    pp.Unparse(ad_str, this);
++    return ad_str;
++}
++
++std::string ClassAdWrapper::toOldString()
++{
++    classad::ClassAdUnParser pp;
++    std::string ad_str;
++    pp.SetOldClassAd(true);
++    pp.Unparse(ad_str, this);
++    return ad_str;
++}
++
++AttrKeyIter ClassAdWrapper::beginKeys()
++{
++    return AttrKeyIter(begin());
++}
++
++
++AttrKeyIter ClassAdWrapper::endKeys()
++{
++    return AttrKeyIter(end());
++}
++
++AttrValueIter ClassAdWrapper::beginValues()
++{
++    return AttrValueIter(begin());
++}
++
++AttrValueIter ClassAdWrapper::endValues()
++{
++    return AttrValueIter(end());
++}
++
++AttrItemIter ClassAdWrapper::beginItems()
++{
++    return AttrItemIter(begin());
++}
++
++
++AttrItemIter ClassAdWrapper::endItems()
++{
++    return AttrItemIter(end());
++}
++
++
++ClassAdWrapper::ClassAdWrapper() : classad::ClassAd() {}
++
++
++ClassAdWrapper::ClassAdWrapper(const std::string &str)
++{
++    classad::ClassAdParser parser;
++    classad::ClassAd *result = parser.ParseClassAd(str);
++    if (!result)
++    {
++        PyErr_SetString(PyExc_SyntaxError, "Unable to parse string into a ClassAd.");
++        boost::python::throw_error_already_set();
++    }
++    CopyFrom(*result);
++    result;
++}
++
+diff --git a/src/condor_contrib/python-bindings/classad_module.cpp b/src/condor_contrib/python-bindings/classad_module.cpp
+new file mode 100644
+index 0000000..b3f1970
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/classad_module.cpp
+@@ -0,0 +1,145 @@
++
++#include <boost/python.hpp>
++#include <classad/source.h>
++
++#include "classad_wrapper.h"
++#include "exprtree_wrapper.h"
++
++using namespace boost::python;
++
++
++Py_ssize_t py_len(boost::python::object const& obj)
++{
++    Py_ssize_t result = PyObject_Length(obj.ptr());
++    if (PyErr_Occurred()) boost::python::throw_error_already_set();
++    return result;
++}
++
++
++std::string ClassadLibraryVersion()
++{
++    std::string val;
++    classad::ClassAdLibraryVersion(val);
++    return val;
++}
++
++
++ClassAdWrapper *parseString(const std::string &str)
++{
++    classad::ClassAdParser parser;
++    classad::ClassAd *result = parser.ParseClassAd(str);
++    if (!result)
++    {
++        PyErr_SetString(PyExc_SyntaxError, "Unable to parse string into a ClassAd.");
++        boost::python::throw_error_already_set();
++    }
++    ClassAdWrapper * wrapper_result = new ClassAdWrapper();
++    wrapper_result->CopyFrom(*result);
++    delete result;
++    return wrapper_result;
++}
++
++
++ClassAdWrapper *parseFile(FILE *stream)
++{
++    classad::ClassAdParser parser;
++    classad::ClassAd *result = parser.ParseClassAd(stream);
++    if (!result)
++    {
++        PyErr_SetString(PyExc_SyntaxError, "Unable to parse input stream into a ClassAd.");
++        boost::python::throw_error_already_set();
++    }
++    ClassAdWrapper * wrapper_result = new ClassAdWrapper();
++    wrapper_result->CopyFrom(*result);
++    delete result;
++    return wrapper_result;
++}
++
++ClassAdWrapper *parseOld(object input)
++{
++    ClassAdWrapper * wrapper = new ClassAdWrapper();
++    object input_list;
++    extract<std::string> input_extract(input);
++    if (input_extract.check())
++    {
++        input_list = input.attr("splitlines")();
++    }
++    else
++    {
++        input_list = input.attr("readlines")();
++    }
++    unsigned input_len = py_len(input_list);
++    for (unsigned idx=0; idx<input_len; idx++)
++    {
++        object line = input_list[idx].attr("strip")();
++        if (line.attr("startswith")("#"))
++        {
++            continue;
++        }
++        std::string line_str = extract<std::string>(line);
++        if (!wrapper->Insert(line_str))
++        {
++            PyErr_SetString(PyExc_SyntaxError, line_str.c_str());
++            throw_error_already_set();
++        }
++    }
++    return wrapper;
++}
++
++void *convert_to_FILEptr(PyObject* obj) {
++    return PyFile_Check(obj) ? PyFile_AsFile(obj) : 0;
++}
++
++BOOST_PYTHON_MODULE(classad)
++{
++    using namespace boost::python;
++
++    def("version", ClassadLibraryVersion, "Return the version of the linked ClassAd library.");
++
++    def("parse", parseString, return_value_policy<manage_new_object>());
++    def("parse", parseFile, return_value_policy<manage_new_object>(),
++        "Parse input into a ClassAd.\n"
++        ":param input: A string or a file pointer.\n"
++        ":return: A ClassAd object.");
++    def("parseOld", parseOld, return_value_policy<manage_new_object>(),
++        "Parse old ClassAd format input into a ClassAd.\n"
++        ":param input: A string or a file pointer.\n"
++        ":return: A ClassAd object.");
++
++    class_<ClassAdWrapper, boost::noncopyable>("ClassAd", "A classified advertisement.")
++        .def(init<std::string>())
++        .def("__delitem__", &ClassAdWrapper::Delete)
++        .def("__getitem__", &ClassAdWrapper::LookupWrap)
++        .def("eval", &ClassAdWrapper::EvaluateAttrObject, "Evaluate the ClassAd attribute to a python object.")
++        .def("__setitem__", &ClassAdWrapper::InsertAttrObject)
++        .def("__str__", &ClassAdWrapper::toString)
++        .def("__repr__", &ClassAdWrapper::toRepr)
++        // I see no way to use the SetParentScope interface safely.
++        // Delay exposing it to python until we absolutely have to!
++        //.def("setParentScope", &ClassAdWrapper::SetParentScope)
++        .def("__iter__", boost::python::range(&ClassAdWrapper::beginKeys, &ClassAdWrapper::endKeys))
++        .def("keys", boost::python::range(&ClassAdWrapper::beginKeys, &ClassAdWrapper::endKeys))
++        .def("values", boost::python::range(&ClassAdWrapper::beginValues, &ClassAdWrapper::endValues))
++        .def("items", boost::python::range(&ClassAdWrapper::beginItems, &ClassAdWrapper::endItems))
++        .def("__len__", &ClassAdWrapper::size)
++        .def("lookup", &ClassAdWrapper::LookupExpr, "Lookup an attribute and return a ClassAd expression.  This method will not attempt to evaluate it to a python object.")
++        .def("printOld", &ClassAdWrapper::toOldString, "Represent this ClassAd as a string in the \"old ClassAd\" format.")
++        ;
++
++    class_<ExprTreeHolder>("ExprTree", "An expression in the ClassAd language", init<std::string>())
++        .def("__str__", &ExprTreeHolder::toString)
++        .def("__repr__", &ExprTreeHolder::toRepr)
++        .def("eval", &ExprTreeHolder::Evaluate)
++        ;
++
++    register_ptr_to_python< boost::shared_ptr<ClassAdWrapper> >();
++
++    boost::python::enum_<classad::Value::ValueType>("Value")
++        .value("Error", classad::Value::ERROR_VALUE)
++        .value("Undefined", classad::Value::UNDEFINED_VALUE)
++        ;
++
++    boost::python::converter::registry::insert(convert_to_FILEptr,
++        boost::python::type_id<FILE>());
++}
++
+diff --git a/src/condor_contrib/python-bindings/classad_wrapper.h b/src/condor_contrib/python-bindings/classad_wrapper.h
+new file mode 100644
+index 0000000..96600c3
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/classad_wrapper.h
+@@ -0,0 +1,72 @@
++
++#ifndef __CLASSAD_WRAPPER_H_
++#define __CLASSAD_WRAPPER_H_
++
++#include <classad/classad.h>
++#include <boost/python.hpp>
++#include <boost/iterator/transform_iterator.hpp>
++
++struct AttrPairToFirst :
++  public std::unary_function<std::pair<std::string, classad::ExprTree*> const&, std::string>
++{
++  AttrPairToFirst::result_type operator()(AttrPairToFirst::argument_type p) const
++  {
++    return p.first;
++  }
++};
++
++typedef boost::transform_iterator<AttrPairToFirst, classad::AttrList::iterator> AttrKeyIter;
++
++class ExprTreeHolder;
++
++struct AttrPairToSecond :
++  public std::unary_function<std::pair<std::string, classad::ExprTree*> const&, boost::python::object>
++{   
++  AttrPairToSecond::result_type operator()(AttrPairToSecond::argument_type p) const;
++};
++
++typedef boost::transform_iterator<AttrPairToSecond, classad::AttrList::iterator> AttrValueIter;
++
++struct AttrPair :
++  public std::unary_function<std::pair<std::string, classad::ExprTree*> const&, boost::python::object>
++{
++  AttrPair::result_type operator()(AttrPair::argument_type p) const;
++};
++
++typedef boost::transform_iterator<AttrPair, classad::AttrList::iterator> AttrItemIter;
++
++struct ClassAdWrapper : classad::ClassAd, boost::python::wrapper<classad::ClassAd>
++{
++    boost::python::object LookupWrap( const std::string &attr) const;
++
++    boost::python::object EvaluateAttrObject(const std::string &attr) const;
++
++    void InsertAttrObject( const std::string &attr, boost::python::object value);
++
++    boost::python::object LookupExpr(const std::string &attr) const;
++
++    std::string toRepr();
++
++    std::string toString();
++
++    std::string toOldString();
++
++    AttrKeyIter beginKeys();
++
++    AttrKeyIter endKeys();
++
++    AttrValueIter beginValues();
++
++    AttrValueIter endValues();
++
++    AttrItemIter beginItems();
++
++    AttrItemIter endItems();
++
++    ClassAdWrapper();
++
++    ClassAdWrapper(const std::string &str);
++};
++
++#endif
++
+diff --git a/src/condor_contrib/python-bindings/collector.cpp b/src/condor_contrib/python-bindings/collector.cpp
+new file mode 100644
+index 0000000..3c4fa39
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/collector.cpp
+@@ -0,0 +1,329 @@
++
++#include "condor_adtypes.h"
++#include "dc_collector.h"
++#include "condor_version.h"
++
++#include <memory>
++#include <boost/python.hpp>
++
++#include "old_boost.h"
++#include "classad_wrapper.h"
++
++using namespace boost::python;
++
++AdTypes convert_to_ad_type(daemon_t d_type)
++{
++    AdTypes ad_type = NO_AD;
++    switch (d_type)
++    {
++    case DT_MASTER:
++        ad_type = MASTER_AD;
++        break;
++    case DT_STARTD:
++        ad_type = STARTD_AD;
++        break;
++    case DT_SCHEDD:
++        ad_type = SCHEDD_AD;
++        break;
++    case DT_NEGOTIATOR:
++        ad_type = NEGOTIATOR_AD;
++        break;
++    case DT_COLLECTOR:
++        ad_type = COLLECTOR_AD;
++        break;
++    default:
++        PyErr_SetString(PyExc_ValueError, "Unknown daemon type.");
++        throw_error_already_set();
++    }
++    return ad_type;
++}
++
++struct Collector {
++
++    Collector(const std::string &pool="")
++      : m_collectors(NULL)
++    {
++        if (pool.size())
++            m_collectors = CollectorList::create(pool.c_str());
++        else
++            m_collectors = CollectorList::create();
++    }
++
++    ~Collector()
++    {
++        if (m_collectors) delete m_collectors;
++    }
++
++    object query(AdTypes ad_type, const std::string &constraint, list attrs)
++    {
++        CondorQuery query(ad_type);
++        if (constraint.length())
++        {
++            query.addANDConstraint(constraint.c_str());
++        }
++        std::vector<const char *> attrs_char;
++        std::vector<std::string> attrs_str;
++        int len_attrs = py_len(attrs);
++        if (len_attrs)
++        {
++            attrs_str.reserve(len_attrs);
++            attrs_char.reserve(len_attrs+1);
++            attrs_char[len_attrs] = NULL;
++            for (int i=0; i<len_attrs; i++)
++            {
++                std::string str = extract<std::string>(attrs[i]);
++                attrs_str.push_back(str);
++                attrs_char[i] = attrs_str[i].c_str();
++            }
++            query.setDesiredAttrs(&attrs_char[0]);
++        }
++        ClassAdList adList;
++
++        QueryResult result = m_collectors->query(query, adList, NULL);
++
++        switch (result)
++        {
++        case Q_OK:
++            break;
++        case Q_INVALID_CATEGORY:
++            PyErr_SetString(PyExc_RuntimeError, "Category not supported by query type.");
++            boost::python::throw_error_already_set();
++        case Q_MEMORY_ERROR:
++            PyErr_SetString(PyExc_MemoryError, "Memory allocation error.");
++            boost::python::throw_error_already_set();
++        case Q_PARSE_ERROR:
++            PyErr_SetString(PyExc_SyntaxError, "Query constraints could not be parsed.");
++            boost::python::throw_error_already_set();
++        case Q_COMMUNICATION_ERROR:
++            PyErr_SetString(PyExc_IOError, "Failed communication with collector.");
++            boost::python::throw_error_already_set();
++        case Q_INVALID_QUERY:
++            PyErr_SetString(PyExc_RuntimeError, "Invalid query.");
++            boost::python::throw_error_already_set();
++        case Q_NO_COLLECTOR_HOST:
++            PyErr_SetString(PyExc_RuntimeError, "Unable to determine collector host.");
++            boost::python::throw_error_already_set();
++        default:
++            PyErr_SetString(PyExc_RuntimeError, "Unknown error from collector query.");
++            boost::python::throw_error_already_set();
++        }
++
++        list retval;
++        ClassAd * ad;
++        adList.Open();
++        while ((ad = adList.Next()))
++        {
++            boost::shared_ptr<ClassAdWrapper> wrapper(new ClassAdWrapper());
++            wrapper->CopyFrom(*ad);
++            retval.append(wrapper);
++        }
++        return retval;
++    }
++
++    object locateAll(daemon_t d_type)
++    {
++        AdTypes ad_type = convert_to_ad_type(d_type);
++        return query(ad_type, "", list());
++    }
++
++    object locate(daemon_t d_type, const std::string &name)
++    {
++        std::string constraint = ATTR_NAME " =?= \"" + name + "\"";
++        object result = query(convert_to_ad_type(d_type), constraint, list());
++        if (py_len(result) >= 1) {
++            return result[0];
++        }
++        PyErr_SetString(PyExc_ValueError, "Unable to find daemon.");
++        throw_error_already_set();
++        return object();
++    }
++
++    ClassAdWrapper *locateLocal(daemon_t d_type)
++    {
++        Daemon my_daemon( d_type, 0, 0 );
++
++        ClassAdWrapper *wrapper = new ClassAdWrapper();
++        if (my_daemon.locate())
++        {
++            classad::ClassAd *daemonAd;
++            if ((daemonAd = my_daemon.daemonAd()))
++            {
++                wrapper->CopyFrom(*daemonAd);
++            }
++            else
++            {
++                std::string addr = my_daemon.addr();
++                if (!my_daemon.addr() || !wrapper->InsertAttr(ATTR_MY_ADDRESS, addr))
++                {
++                    PyErr_SetString(PyExc_RuntimeError, "Unable to locate daemon address.");
++                    throw_error_already_set();
++                }
++                std::string name = my_daemon.name() ? my_daemon.name() : "Unknown";
++                if (!wrapper->InsertAttr(ATTR_NAME, name))
++                {
++                    PyErr_SetString(PyExc_RuntimeError, "Unable to insert daemon name.");
++                    throw_error_already_set();
++                }
++                std::string hostname = my_daemon.fullHostname() ? my_daemon.fullHostname() : "Unknown";
++                if (!wrapper->InsertAttr(ATTR_MACHINE, hostname))
++                {
++                    PyErr_SetString(PyExc_RuntimeError, "Unable to insert daemon hostname.");
++                    throw_error_already_set();
++                }
++                std::string version = my_daemon.version() ? my_daemon.version() : "";
++                if (!wrapper->InsertAttr(ATTR_VERSION, version))
++                {
++                    PyErr_SetString(PyExc_RuntimeError, "Unable to insert daemon version.");
++                    throw_error_already_set();
++                }
++                const char * my_type = AdTypeToString(convert_to_ad_type(d_type));
++                if (!my_type)
++                {
++                    PyErr_SetString(PyExc_ValueError, "Unable to determined daemon type.");
++                    throw_error_already_set();
++                }
++                std::string my_type_str = my_type;
++                if (!wrapper->InsertAttr(ATTR_MY_TYPE, my_type_str))
++                {
++                    PyErr_SetString(PyExc_RuntimeError, "Unable to insert daemon type.");
++                    throw_error_already_set();
++                }
++                std::string cversion = CondorVersion(); std::string platform = CondorPlatform();
++                if (!wrapper->InsertAttr(ATTR_VERSION, cversion) || !wrapper->InsertAttr(ATTR_PLATFORM, platform))
++                {
++                    PyErr_SetString(PyExc_RuntimeError, "Unable to insert HTCondor version.");
++                    throw_error_already_set();
++                }
++            }
++        }
++        else
++        {
++            PyErr_SetString(PyExc_RuntimeError, "Unable to locate local daemon");
++            boost::python::throw_error_already_set();
++        }
++        return wrapper;
++    }
++
++
++    // Overloads for the Collector; can't be done in boost.python and provide
++    // docstrings.
++    object query0()
++    {
++        return query(ANY_AD, "", list());
++    }
++    object query1(AdTypes ad_type)
++    {
++        return query(ad_type, "", list());
++    }
++    object query2(AdTypes ad_type, const std::string &constraint)
++    {
++        return query(ad_type, constraint, list());
++    }
++
++    // TODO: this has crappy error handling when there are multiple collectors.
++    void advertise(list ads, const std::string &command_str="UPDATE_AD_GENERIC", bool use_tcp=false)
++    {
++        m_collectors->rewind();
++        Daemon *collector;
++        std::auto_ptr<Sock> sock;
++
++        int command = getCollectorCommandNum(command_str.c_str());
++        if (command == -1)
++        {
++            PyErr_SetString(PyExc_ValueError, ("Invalid command " + command_str).c_str());
++            throw_error_already_set();
++        }
++
++        if (command == UPDATE_STARTD_AD_WITH_ACK)
++        {
++            PyErr_SetString(PyExc_NotImplementedError, "Startd-with-ack protocol is not implemented at this time.");
++        }
++
++        int list_len = py_len(ads);
++        if (!list_len)
++            return;
++
++        compat_classad::ClassAd ad;
++        while (m_collectors->next(collector))
++        {
++            if(!collector->locate()) {
++                PyErr_SetString(PyExc_ValueError, "Unable to locate collector.");
++                throw_error_already_set();
++            }
++            int list_len = py_len(ads);
++            sock.reset();
++            for (int i=0; i<list_len; i++)
++            {
++                ClassAdWrapper &wrapper = extract<ClassAdWrapper &>(ads[i]);
++                ad.CopyFrom(wrapper);
++                if (use_tcp)
++                {
++                    if (!sock.get())
++                        sock.reset(collector->startCommand(command,Stream::reli_sock,20));
++                    else
++                    {
++                        sock->encode();
++                        sock->put(command);
++                    }
++                }
++                else
++                {
++                    sock.reset(collector->startCommand(command,Stream::safe_sock,20));
++                }
++                int result = 0;
++                if (sock.get()) {
++                    result += ad.put(*sock);
++                    result += sock->end_of_message();
++                }
++                if (result != 2) {
++                    PyErr_SetString(PyExc_ValueError, "Failed to advertise to collector");
++                    throw_error_already_set();
++                }
++            }
++            sock->encode();
++            sock->put(DC_NOP);
++            sock->end_of_message();
++        }
++    }
++
++private:
++
++    CollectorList *m_collectors;
++
++};
++
++BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(advertise_overloads, advertise, 1, 3);
++
++void export_collector()
++{
++    class_<Collector>("Collector", "Client-side operations for the HTCondor collector")
++        .def(init<std::string>(":param pool: Name of collector to query; if not specified, uses the local one."))
++        .def("query", &Collector::query0)
++        .def("query", &Collector::query1)
++        .def("query", &Collector::query2)
++        .def("query", &Collector::query,
++            "Query the contents of a collector.\n"
++            ":param ad_type: Type of ad to return from the AdTypes enum; if not specified, uses ANY_AD.\n"
++            ":param constraint: A constraint for the ad query; defaults to true.\n"
++            ":param attrs: A list of attributes; if specified, the returned ads will be "
++            "projected along these attributes.\n"
++            ":return: A list of ads in the collector matching the constraint.")
++        .def("locate", &Collector::locateLocal, return_value_policy<manage_new_object>())
++        .def("locate", &Collector::locate,
++            "Query the collector for a particular daemon.\n"
++            ":param daemon_type: Type of daemon; must be from the DaemonTypes enum.\n"
++            ":param name: Name of daemon to locate.  If not specified, it searches for the local daemon.\n"
++            ":return: The ad of the corresponding daemon.")
++        .def("locateAll", &Collector::locateAll,
++            "Query the collector for all ads of a particular type.\n"
++            ":param daemon_type: Type of daemon; must be from the DaemonTypes enum.\n"
++            ":return: A list of matching ads.")
++        .def("advertise", &Collector::advertise, advertise_overloads(
++            "Advertise a list of ClassAds into the collector.\n"
++            ":param ad_list: A list of ClassAds.\n"
++            ":param command: A command for the collector; defaults to UPDATE_AD_GENERIC;"
++            " other commands, such as UPDATE_STARTD_AD, may require reduced authorization levels.\n"
++            ":param use_tcp: When set to true, updates are sent via TCP."))
++        ;
++}
++
+diff --git a/src/condor_contrib/python-bindings/condor.cpp b/src/condor_contrib/python-bindings/condor.cpp
+new file mode 100644
+index 0000000..f4a4fd4
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/condor.cpp
+@@ -0,0 +1,25 @@
++
++#include <boost/python.hpp>
++
++#include "old_boost.h"
++#include "export_headers.h"
++
++using namespace boost::python;
++
++
++BOOST_PYTHON_MODULE(condor)
++{
++    scope().attr("__doc__") = "Utilities for interacting with the HTCondor system.";
++
++    py_import("classad");
++
++    // TODO: old boost doesn't have this; conditionally compile only one newer systems.
++    //docstring_options local_docstring_options(true, false, false);
++
++    export_config();
++    export_daemon_and_ad_types();
++    export_collector();
++    export_schedd();
++    export_dc_tool();
++    export_secman();
++}
+diff --git a/src/condor_contrib/python-bindings/config.cpp b/src/condor_contrib/python-bindings/config.cpp
+new file mode 100644
+index 0000000..0afdfc4
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/config.cpp
+@@ -0,0 +1,60 @@
++
++#include "condor_common.h"
++#include "condor_config.h"
++#include "condor_version.h"
++
++#include <boost/python.hpp>
++
++using namespace boost::python;
++
++struct Param
++{
++    std::string getitem(const std::string &attr)
++    {
++        std::string result;
++        if (!param(result, attr.c_str()))
++        {
++            PyErr_SetString(PyExc_KeyError, attr.c_str());
++            throw_error_already_set();
++        }
++        return result;
++    }
++
++    void setitem(const std::string &attr, const std::string &val)
++    {
++        param_insert(attr.c_str(), val.c_str());
++    }
++
++    std::string setdefault(const std::string &attr, const std::string &def)
++    {
++        std::string result;
++        if (!param(result, attr.c_str()))
++        {
++           param_insert(attr.c_str(), def.c_str());
++           return def;
++        }
++        return result;
++    }
++};
++
++std::string CondorVersionWrapper() { return CondorVersion(); }
++
++std::string CondorPlatformWrapper() { return CondorPlatform(); }
++
++BOOST_PYTHON_FUNCTION_OVERLOADS(config_overloads, config, 0, 3);
++
++void export_config()
++{
++    config();
++    def("version", CondorVersionWrapper, "Returns the version of HTCondor this module is linked against.");
++    def("platform", CondorPlatformWrapper, "Returns the platform of HTCondor this module is running on.");
++    def("reload_config", config, config_overloads("Reload the HTCondor configuration from disk."));
++    class_<Param>("_Param")
++        .def("__getitem__", &Param::getitem)
++        .def("__setitem__", &Param::setitem)
++        .def("setdefault", &Param::setdefault)
++        ;
++    object param = object(Param());
++    param.attr("__doc__") = "A dictionary-like object containing the HTCondor configuration.";
++    scope().attr("param") = param;
++}
+diff --git a/src/condor_contrib/python-bindings/daemon_and_ad_types.cpp b/src/condor_contrib/python-bindings/daemon_and_ad_types.cpp
+new file mode 100644
+index 0000000..f2b0bab
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/daemon_and_ad_types.cpp
+@@ -0,0 +1,30 @@
++
++#include <condor_adtypes.h>
++#include <daemon_types.h>
++#include <boost/python.hpp>
++
++using namespace boost::python;
++
++void export_daemon_and_ad_types()
++{
++    enum_<daemon_t>("DaemonTypes")
++        .value("None", DT_NONE)
++        .value("Any", DT_ANY)
++        .value("Master", DT_MASTER)
++        .value("Schedd", DT_SCHEDD)
++        .value("Startd", DT_STARTD)
++        .value("Collector", DT_COLLECTOR)
++        .value("Negotiator", DT_NEGOTIATOR)
++        ;
++
++    enum_<AdTypes>("AdTypes")
++        .value("None", NO_AD)
++        .value("Any", ANY_AD)
++        .value("Generic", GENERIC_AD)
++        .value("Startd", STARTD_AD)
++        .value("Schedd", SCHEDD_AD)
++        .value("Master", MASTER_AD)
++        .value("Collector", COLLECTOR_AD)
++        .value("Negotiator", NEGOTIATOR_AD)
++        ;
++}
+diff --git a/src/condor_contrib/python-bindings/dc_tool.cpp b/src/condor_contrib/python-bindings/dc_tool.cpp
+new file mode 100644
+index 0000000..973c1e3
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/dc_tool.cpp
+@@ -0,0 +1,129 @@
++
++#include "condor_common.h"
++
++#include <boost/python.hpp>
++
++#include "daemon.h"
++#include "daemon_types.h"
++#include "condor_commands.h"
++#include "condor_attributes.h"
++#include "compat_classad.h"
++
++#include "classad_wrapper.h"
++
++using namespace boost::python;
++
++enum DaemonCommands {
++  DDAEMONS_OFF = DAEMONS_OFF,
++  DDAEMONS_OFF_FAST = DAEMONS_OFF_FAST,
++  DDAEMONS_OFF_PEACEFUL = DAEMONS_OFF_PEACEFUL,
++  DDAEMON_OFF = DAEMON_OFF,
++  DDAEMON_OFF_FAST = DAEMON_OFF_FAST,
++  DDAEMON_OFF_PEACEFUL = DAEMON_OFF_PEACEFUL,
++  DDC_OFF_FAST = DC_OFF_FAST,
++  DDC_OFF_PEACEFUL = DC_OFF_PEACEFUL,
++  DDC_OFF_GRACEFUL = DC_OFF_GRACEFUL,
++  DDC_SET_PEACEFUL_SHUTDOWN = DC_SET_PEACEFUL_SHUTDOWN,
++  DDC_RECONFIG_FULL = DC_RECONFIG_FULL,
++  DRESTART = RESTART,
++  DRESTART_PEACEFUL = RESTART_PEACEFUL
++};
++
++void send_command(const ClassAdWrapper & ad, DaemonCommands dc, const std::string &target="")
++{
++    std::string addr;
++    if (!ad.EvaluateAttrString(ATTR_MY_ADDRESS, addr))
++    {
++        PyErr_SetString(PyExc_ValueError, "Address not available in location ClassAd.");
++        throw_error_already_set();
++    }
++    std::string ad_type_str;
++    if (!ad.EvaluateAttrString(ATTR_MY_TYPE, ad_type_str))
++    {
++        PyErr_SetString(PyExc_ValueError, "Daemon type not available in location ClassAd.");
++        throw_error_already_set();
++    }
++    int ad_type = AdTypeFromString(ad_type_str.c_str());
++    if (ad_type == NO_AD)
++    {
++        printf("ad type %s.\n", ad_type_str.c_str());
++        PyErr_SetString(PyExc_ValueError, "Unknown ad type.");
++        throw_error_already_set();
++    }
++    daemon_t d_type;
++    switch (ad_type) {
++    case MASTER_AD: d_type = DT_MASTER; break;
++    case STARTD_AD: d_type = DT_STARTD; break;
++    case SCHEDD_AD: d_type = DT_SCHEDD; break;
++    case NEGOTIATOR_AD: d_type = DT_NEGOTIATOR; break;
++    case COLLECTOR_AD: d_type = DT_COLLECTOR; break;
++    default:
++        d_type = DT_NONE;
++        PyErr_SetString(PyExc_ValueError, "Unknown daemon type.");
++        throw_error_already_set();
++    }
++
++    ClassAd ad_copy; ad_copy.CopyFrom(ad);
++    Daemon d(&ad_copy, d_type, NULL);
++    if (!d.locate())
++    {
++        PyErr_SetString(PyExc_RuntimeError, "Unable to locate daemon.");
++        throw_error_already_set();
++    }
++    ReliSock sock;
++    if (!sock.connect(d.addr()))
++    {
++        PyErr_SetString(PyExc_RuntimeError, "Unable to connect to the remote daemon");
++        throw_error_already_set();
++    }
++    if (!d.startCommand(dc, &sock, 0, NULL))
++    {
++        PyErr_SetString(PyExc_RuntimeError, "Failed to start command.");
++        throw_error_already_set();
++    }
++    if (target.size())
++    {
++        std::vector<unsigned char> target_cstr; target_cstr.reserve(target.size()+1);
++        memcpy(&target_cstr[0], target.c_str(), target.size()+1);
++        if (!sock.code(&target_cstr[0]))
++        {
++            PyErr_SetString(PyExc_RuntimeError, "Failed to send target.");
++            throw_error_already_set();
++        }
++        if (!sock.end_of_message())
++        {
++            PyErr_SetString(PyExc_RuntimeError, "Failed to send end-of-message.");
++            throw_error_already_set();
++        }
++    }
++    sock.close();
++}
++
++BOOST_PYTHON_FUNCTION_OVERLOADS(send_command_overloads, send_command, 2, 3);
++
++void
++export_dc_tool()
++{
++    enum_<DaemonCommands>("DaemonCommands")
++        .value("DaemonsOff", DDAEMONS_OFF)
++        .value("DaemonsOffFast", DDAEMONS_OFF_FAST)
++        .value("DaemonsOffPeaceful", DDAEMONS_OFF_PEACEFUL)
++        .value("DaemonOff", DDAEMON_OFF)
++        .value("DaemonOffFast", DDAEMON_OFF_FAST)
++        .value("DaemonOffPeaceful", DDAEMON_OFF_PEACEFUL)
++        .value("OffGraceful", DDC_OFF_GRACEFUL)
++        .value("OffPeaceful", DDC_OFF_PEACEFUL)
++        .value("OffFast", DDC_OFF_FAST)
++        .value("SetPeacefulShutdown", DDC_SET_PEACEFUL_SHUTDOWN)
++        .value("Reconfig", DDC_RECONFIG_FULL)
++        .value("Restart", DRESTART)
++        .value("RestartPeacful", DRESTART_PEACEFUL)
++        ;
++
++    def("send_command", send_command, send_command_overloads("Send a command to a HTCondor daemon specified by a location ClassAd\n"
++        ":param ad: An ad specifying the location of the daemon; typically, found by using Collector.locate(...).\n"
++        ":param dc: A command type; must be a member of the enum DaemonCommands.\n"
++        ":param target: Some commands require additional arguments; for example, sending DaemonOff to a master requires one to specify which subsystem to turn off."
++        "  If this parameter is given, the daemon is sent an additional argument."))
++        ;
++}
+diff --git a/src/condor_contrib/python-bindings/export_headers.h b/src/condor_contrib/python-bindings/export_headers.h
+new file mode 100644
+index 0000000..4480495
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/export_headers.h
+@@ -0,0 +1,8 @@
++
++void export_collector();
++void export_schedd();
++void export_dc_tool();
++void export_daemon_and_ad_types();
++void export_config();
++void export_secman();
++
+diff --git a/src/condor_contrib/python-bindings/exprtree_wrapper.h b/src/condor_contrib/python-bindings/exprtree_wrapper.h
+new file mode 100644
+index 0000000..e3d2bc0
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/exprtree_wrapper.h
+@@ -0,0 +1,30 @@
++
++#ifndef __EXPRTREE_WRAPPER_H_
++#define __EXPRTREE_WRAPPER_H_
++
++#include <classad/exprTree.h>
++#include <boost/python.hpp>
++
++struct ExprTreeHolder
++{
++    ExprTreeHolder(const std::string &str);
++
++    ExprTreeHolder(classad::ExprTree *expr);
++
++    ~ExprTreeHolder();
++
++    boost::python::object Evaluate() const;
++
++    std::string toRepr();
++
++    std::string toString();
++
++    classad::ExprTree *get();
++
++private:
++    classad::ExprTree *m_expr;
++    bool m_owns;
++};
++
++#endif
++
+diff --git a/src/condor_contrib/python-bindings/old_boost.h b/src/condor_contrib/python-bindings/old_boost.h
+new file mode 100644
+index 0000000..7d159bc
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/old_boost.h
+@@ -0,0 +1,25 @@
++
++#include <boost/python.hpp>
++
++/*
++ * This header contains all boost.python constructs missing in
++ * older versions of boost.
++ *
++ * We'll eventually not compile these if the version of boost
++ * is sufficiently recent.
++ */
++
++inline ssize_t py_len(boost::python::object const& obj)
++{
++    ssize_t result = PyObject_Length(obj.ptr());
++    if (PyErr_Occurred()) boost::python::throw_error_already_set();
++    return result;
++}
++
++inline boost::python::object py_import(boost::python::str name)
++{
++  char * n = boost::python::extract<char *>(name);
++  boost::python::handle<> module(PyImport_ImportModule(n));
++  return boost::python::object(module);
++}
++
+diff --git a/src/condor_contrib/python-bindings/schedd.cpp b/src/condor_contrib/python-bindings/schedd.cpp
+new file mode 100644
+index 0000000..9bbc830
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/schedd.cpp
+@@ -0,0 +1,402 @@
++
++#include "condor_attributes.h"
++#include "condor_q.h"
++#include "condor_qmgr.h"
++#include "daemon.h"
++#include "daemon_types.h"
++#include "enum_utils.h"
++#include "dc_schedd.h"
++
++#include <boost/python.hpp>
++
++#include "old_boost.h"
++#include "classad_wrapper.h"
++#include "exprtree_wrapper.h"
++
++using namespace boost::python;
++
++#define DO_ACTION(action_name) \
++    reason_str = extract<std::string>(reason); \
++    if (use_ids) \
++        result = schedd. action_name (&ids, reason_str.c_str(), NULL, AR_TOTALS); \
++    else \
++        result = schedd. action_name (constraint.c_str(), reason_str.c_str(), NULL, AR_TOTALS);
++
++struct Schedd {
++
++    Schedd()
++    {
++        Daemon schedd( DT_SCHEDD, 0, 0 );
++
++        if (schedd.locate())
++        {
++            if (schedd.addr())
++            {
++                m_addr = schedd.addr();
++            }
++            else
++            {
++                PyErr_SetString(PyExc_RuntimeError, "Unable to locate schedd address.");
++                throw_error_already_set();
++            }
++            m_name = schedd.name() ? schedd.name() : "Unknown";
++            m_version = schedd.version() ? schedd.version() : "";
++        }
++        else
++        {
++            PyErr_SetString(PyExc_RuntimeError, "Unable to locate local daemon");
++            boost::python::throw_error_already_set();
++        }
++    }
++
++    Schedd(const ClassAdWrapper &ad)
++      : m_addr(), m_name("Unknown"), m_version("")
++    {
++        if (!ad.EvaluateAttrString(ATTR_SCHEDD_IP_ADDR, m_addr))
++        {
++            PyErr_SetString(PyExc_ValueError, "Schedd address not specified.");
++            throw_error_already_set();
++        }
++        ad.EvaluateAttrString(ATTR_NAME, m_name);
++        ad.EvaluateAttrString(ATTR_VERSION, m_version);
++    }
++
++    object query(const std::string &constraint="", list attrs=list())
++    {
++        CondorQ q;
++
++        if (constraint.size())
++            q.addAND(constraint.c_str());
++
++        StringList attrs_list(NULL, "\n");
++        // Must keep strings alive; StringList does not create an internal copy.
++        int len_attrs = py_len(attrs);
++        std::vector<std::string> attrs_str; attrs_str.reserve(len_attrs);
++        for (int i=0; i<len_attrs; i++)
++        {
++            std::string attrName = extract<std::string>(attrs[i]);
++            attrs_str.push_back(attrName);
++            attrs_list.append(attrs_str[i].c_str());
++        }
++
++        ClassAdList jobs;
++
++        int fetchResult = q.fetchQueueFromHost(jobs, attrs_list, m_addr.c_str(), m_version.c_str(), NULL);
++        switch (fetchResult)
++        {
++        case Q_OK:
++            break;
++        case Q_PARSE_ERROR:
++        case Q_INVALID_CATEGORY:
++            PyErr_SetString(PyExc_RuntimeError, "Parse error in constraint.");
++            throw_error_already_set();
++            break;
++        default:
++            PyErr_SetString(PyExc_IOError, "Failed to fetch ads from schedd.");
++            throw_error_already_set();
++            break;
++        }
++
++        list retval;
++        ClassAd *job;
++        jobs.Open();
++        while ((job = jobs.Next()))
++        {
++            boost::shared_ptr<ClassAdWrapper> wrapper(new ClassAdWrapper());
++            wrapper->CopyFrom(*job);
++            retval.append(wrapper);
++        }
++        return retval;
++    }
++
++    object actOnJobs(JobAction action, object job_spec, object reason=object())
++    {
++        if (reason == object())
++        {
++            reason = object("Python-initiated action");
++        }
++        StringList ids;
++        std::vector<std::string> ids_list;
++        std::string constraint, reason_str, reason_code;
++        bool use_ids = false;
++        extract<std::string> constraint_extract(job_spec);
++        if (constraint_extract.check())
++        {
++            constraint = constraint_extract();
++        }
++        else
++        {
++            int id_len = py_len(job_spec);
++            ids_list.reserve(id_len);
++            for (int i=0; i<id_len; i++)
++            {
++                std::string str = extract<std::string>(job_spec[i]);
++                ids_list.push_back(str);
++                ids.append(ids_list[i].c_str());
++            }
++            use_ids = true;
++        }
++        DCSchedd schedd(m_addr.c_str());
++        ClassAd *result = NULL;
++        VacateType vacate_type;
++        tuple reason_tuple;
++        const char *reason_char, *reason_code_char = NULL;
++        extract<tuple> try_extract_tuple(reason);
++        switch (action)
++        {
++        case JA_HOLD_JOBS:
++            if (try_extract_tuple.check())
++            {
++                reason_tuple = extract<tuple>(reason);
++                if (py_len(reason_tuple) != 2)
++                {
++                    PyErr_SetString(PyExc_ValueError, "Hold action requires (hold string, hold code) tuple as the reason.");
++                    throw_error_already_set();
++                }
++                reason_str = extract<std::string>(reason_tuple[0]); reason_char = reason_str.c_str();
++                reason_code = extract<std::string>(reason_tuple[1]); reason_code_char = reason_code.c_str();
++            }
++            else
++            {
++                reason_str = extract<std::string>(reason);
++                reason_char = reason_str.c_str();
++            }
++            if (use_ids)
++                result = schedd.holdJobs(&ids, reason_char, reason_code_char, NULL, AR_TOTALS);
++            else
++                result = schedd.holdJobs(constraint.c_str(), reason_char, reason_code_char, NULL, AR_TOTALS);
++            break;
++        case JA_RELEASE_JOBS:
++            DO_ACTION(releaseJobs)
++            break;
++        case JA_REMOVE_JOBS:
++            DO_ACTION(removeJobs)
++            break;
++        case JA_REMOVE_X_JOBS:
++            DO_ACTION(removeXJobs)
++            break;
++        case JA_VACATE_JOBS:
++        case JA_VACATE_FAST_JOBS:
++            vacate_type = action == JA_VACATE_JOBS ? VACATE_GRACEFUL : VACATE_FAST;
++            if (use_ids)
++                result = schedd.vacateJobs(&ids, vacate_type, NULL, AR_TOTALS);
++            else
++                result = schedd.vacateJobs(constraint.c_str(), vacate_type, NULL, AR_TOTALS);
++            break;
++        case JA_SUSPEND_JOBS:
++            DO_ACTION(suspendJobs)
++            break;
++        case JA_CONTINUE_JOBS:
++            DO_ACTION(continueJobs)
++            break;
++        default:
++            PyErr_SetString(PyExc_NotImplementedError, "Job action not implemented.");
++            throw_error_already_set();
++        }
++        if (!result)
++        {
++            PyErr_SetString(PyExc_RuntimeError, "Error when querying the schedd.");
++            throw_error_already_set();
++        }
++
++        boost::shared_ptr<ClassAdWrapper> wrapper(new ClassAdWrapper());
++        wrapper->CopyFrom(*result);
++        object wrapper_obj(wrapper);
++
++        boost::shared_ptr<ClassAdWrapper> result_ptr(new ClassAdWrapper());
++        object result_obj(result_ptr);
++
++        result_obj["TotalError"] = wrapper_obj["result_total_0"];
++        result_obj["TotalSuccess"] = wrapper_obj["result_total_1"];
++        result_obj["TotalNotFound"] = wrapper_obj["result_total_2"];
++        result_obj["TotalBadStatus"] = wrapper_obj["result_total_3"];
++        result_obj["TotalAlreadyDone"] = wrapper_obj["result_total_4"];
++        result_obj["TotalPermissionDenied"] = wrapper_obj["result_total_5"];
++        result_obj["TotalJobAds"] = wrapper_obj["TotalJobAds"];
++        result_obj["TotalChangedAds"] = wrapper_obj["ActionResult"];
++        return result_obj;
++    }
++
++    object actOnJobs2(JobAction action, object job_spec)
++    {
++        return actOnJobs(action, job_spec, object("Python-initiated action."));
++    }
++
++    int submit(ClassAdWrapper &wrapper, int count=1)
++    {
++        ConnectionSentry sentry(*this); // Automatically connects / disconnects.
++
++        int cluster = NewCluster();
++        if (cluster < 0)
++        {
++            PyErr_SetString(PyExc_RuntimeError, "Failed to create new cluster.");
++            throw_error_already_set();
++        }
++        ClassAd ad; ad.CopyFrom(wrapper);
++        for (int idx=0; idx<count; idx++)
++        {
++            int procid = NewProc (cluster);
++            if (procid < 0)
++            {
++                PyErr_SetString(PyExc_RuntimeError, "Failed to create new proc id.");
++                throw_error_already_set();
++            }
++            ad.InsertAttr(ATTR_CLUSTER_ID, cluster);
++            ad.InsertAttr(ATTR_PROC_ID, procid);
++
++            classad::ClassAdUnParser unparser;
++            unparser.SetOldClassAd( true );
++            for (classad::ClassAd::const_iterator it = ad.begin(); it != ad.end(); it++)
++            {
++                std::string rhs;
++                unparser.Unparse(rhs, it->second);
++                if (-1 == SetAttribute(cluster, procid, it->first.c_str(), rhs.c_str(), SetAttribute_NoAck))
++                {
++                    PyErr_SetString(PyExc_ValueError, it->first.c_str());
++                    throw_error_already_set();
++                }
++            }
++        }
++
++        return cluster;
++    }
++
++    void edit(object job_spec, std::string attr, object val)
++    {
++        std::vector<int> clusters;
++        std::vector<int> procs;
++        std::string constraint;
++        bool use_ids = false;
++        extract<std::string> constraint_extract(job_spec);
++        if (constraint_extract.check())
++        {
++            constraint = constraint_extract();
++        }
++        else
++        {
++            int id_len = py_len(job_spec);
++            clusters.reserve(id_len);
++            procs.reserve(id_len);
++            for (int i=0; i<id_len; i++)
++            {
++                object id_list = job_spec[i].attr("split")(".");
++                if (py_len(id_list) != 2)
++                {
++                    PyErr_SetString(PyExc_ValueError, "Invalid ID");
++                    throw_error_already_set();
++                }
++                clusters.push_back(extract<int>(long_(id_list[0])));
++                procs.push_back(extract<int>(long_(id_list[1])));
++            }
++            use_ids = true;
++        }
++
++        std::string val_str;
++        extract<ExprTreeHolder &> exprtree_extract(val);
++        if (exprtree_extract.check())
++        {
++            classad::ClassAdUnParser unparser;
++            unparser.Unparse(val_str, exprtree_extract().get());
++        }
++        else
++        {
++            val_str = extract<std::string>(val);
++        }
++
++        ConnectionSentry sentry(*this);
++
++        if (use_ids)
++        {
++            for (unsigned idx=0; idx<clusters.size(); idx++)
++            {
++                if (-1 == SetAttribute(clusters[idx], procs[idx], attr.c_str(), val_str.c_str()))
++                {
++                    PyErr_SetString(PyExc_RuntimeError, "Unable to edit job");
++                    throw_error_already_set();
++                }
++            }
++        }
++        else
++        {
++            if (-1 == SetAttributeByConstraint(constraint.c_str(), attr.c_str(), val_str.c_str()))
++            {
++                PyErr_SetString(PyExc_RuntimeError, "Unable to edit jobs matching constraint");
++                throw_error_already_set();
++            }
++        }
++    }
++
++private:
++    struct ConnectionSentry
++    {
++    public:
++        ConnectionSentry(Schedd &schedd) : m_connected(false)
++        {
++            if (ConnectQ(schedd.m_addr.c_str(), 0, false, NULL, NULL, schedd.m_version.c_str()) == 0)
++            {
++                PyErr_SetString(PyExc_RuntimeError, "Failed to connect to schedd.");
++                throw_error_already_set();
++            }
++            m_connected = true;
++        }
++
++        void disconnect()
++        {
++            if (m_connected && !DisconnectQ(NULL))
++            {
++                m_connected = false;
++                PyErr_SetString(PyExc_RuntimeError, "Failed to commmit and disconnect from queue.");
++                throw_error_already_set();
++            }
++            m_connected = false;
++        }
++
++        ~ConnectionSentry()
++        {
++            disconnect();
++        }
++    private:
++        bool m_connected;
++    };
++
++    std::string m_addr, m_name, m_version;
++};
++
++BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(query_overloads, query, 0, 2);
++BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(submit_overloads, submit, 1, 2);
++
++void export_schedd()
++{
++    enum_<JobAction>("JobAction")
++        .value("Hold", JA_HOLD_JOBS)
++        .value("Release", JA_RELEASE_JOBS)
++        .value("Remove", JA_REMOVE_JOBS)
++        .value("RemoveX", JA_REMOVE_X_JOBS)
++        .value("Vacate", JA_VACATE_JOBS)
++        .value("VacateFast", JA_VACATE_FAST_JOBS)
++        .value("Suspend", JA_SUSPEND_JOBS)
++        .value("Continue", JA_CONTINUE_JOBS)
++        ;
++
++    class_<Schedd>("Schedd", "A client class for the HTCondor schedd")
++        .def(init<const ClassAdWrapper &>(":param ad: An ad containing the location of the schedd"))
++        .def("query", &Schedd::query, query_overloads("Query the HTCondor schedd for jobs.\n"
++            ":param constraint: An optional constraint for filtering out jobs; defaults to 'true'\n"
++            ":param attr_list: A list of attributes for the schedd to project along.  Defaults to having the schedd return all attributes.\n"
++            ":return: A list of matching jobs, containing the requested attributes."))
++        .def("act", &Schedd::actOnJobs2)
++        .def("act", &Schedd::actOnJobs, "Change status of job(s) in the schedd.\n"
++            ":param action: Action to perform; must be from enum JobAction.\n"
++            ":param job_spec: Job specification; can either be a list of job IDs or a string specifying a constraint to match jobs.\n"
++            ":return: Number of jobs changed.")
++        .def("submit", &Schedd::submit, submit_overloads("Submit one or more jobs to the HTCondor schedd.\n"
++            ":param ad: ClassAd describing job cluster.\n"
++            ":param count: Number of jobs to submit to cluster.\n"
++            ":return: Newly created cluster ID."))
++        .def("edit", &Schedd::edit, "Edit one or more jobs in the queue.\n"
++            ":param job_spec: Either a list of jobs (CLUSTER.PROC) or a string containing a constraint to match jobs against.\n"
++            ":param attr: Attribute name to edit.\n"
++            ":param value: The new value of the job attribute; should be a string (which will be converted to a ClassAds expression) or a ClassAds expression.");
++        ;
++}
++
+diff --git a/src/condor_contrib/python-bindings/secman.cpp b/src/condor_contrib/python-bindings/secman.cpp
+new file mode 100644
+index 0000000..343fba8
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/secman.cpp
+@@ -0,0 +1,35 @@
++
++#include "condor_common.h"
++
++#include <boost/python.hpp>
++
++// Note - condor_secman.h can't be included directly.  The following headers must
++// be loaded first.  Sigh.
++#include "condor_ipverify.h"
++#include "sock.h"
++
++#include "condor_secman.h"
++
++using namespace boost::python;
++
++struct SecManWrapper
++{
++public:
++    SecManWrapper() : m_secman() {}
++
++    void
++    invalidateAllCache()
++    {
++        m_secman.invalidateAllCache();
++    }
++
++private:
++    SecMan m_secman;
++};
++
++void
++export_secman()
++{
++    class_<SecManWrapper>("SecMan", "Access to the internal security state information.")
++        .def("invalidateAllSessions", &SecManWrapper::invalidateAllCache, "Invalidate all security sessions.");
++}
+diff --git a/src/condor_contrib/python-bindings/tests/classad_tests.py b/src/condor_contrib/python-bindings/tests/classad_tests.py
+new file mode 100644
+index 0000000..7641190
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/tests/classad_tests.py
+@@ -0,0 +1,79 @@
++#!/usr/bin/python
++
++import re
++import classad
++import unittest
++
++class TestClassad(unittest.TestCase):
++
++    def test_load_classad_from_file(self):
++        ad = classad.parse(open("tests/test.ad"))
++        self.assertEqual(ad["foo"], "bar")
++        self.assertEqual(ad["baz"], classad.Value.Undefined)
++        self.assertRaises(KeyError, ad.__getitem__, "bar")
++
++    def test_old_classad(self):
++        ad = classad.parseOld(open("tests/test.old.ad"))
++        contents = open("tests/test.old.ad").read()
++        self.assertEqual(ad.printOld(), contents)
++
++    def test_exprtree(self):
++        ad = classad.ClassAd()
++        ad["foo"] = classad.ExprTree("2+2")
++        expr = ad["foo"]
++        self.assertEqual(expr.__repr__(), "2 + 2")
++        self.assertEqual(expr.eval(), 4)
++
++    def test_exprtree_func(self):
++        ad = classad.ClassAd()
++        ad["foo"] = classad.ExprTree('regexps("foo (bar)", "foo bar", "\\\\1")')
++        self.assertEqual(ad.eval("foo"), "bar")
++
++    def test_ad_assignment(self):
++        ad = classad.ClassAd()
++        ad["foo"] = 2.1
++        self.assertEqual(ad["foo"], 2.1)
++        ad["foo"] = 2
++        self.assertEqual(ad["foo"], 2)
++        ad["foo"] = "bar"
++        self.assertEqual(ad["foo"], "bar")
++        self.assertRaises(TypeError, ad.__setitem__, {})
++
++    def test_ad_refs(self):
++        ad = classad.ClassAd()
++        ad["foo"] = classad.ExprTree("bar + baz")
++        ad["bar"] = 2.1
++        ad["baz"] = 4
++        self.assertEqual(ad["foo"].__repr__(), "bar + baz")
++        self.assertEqual(ad.eval("foo"), 6.1)
++
++    def test_ad_special_values(self):
++        ad = classad.ClassAd()
++        ad["foo"] = classad.ExprTree('regexp(12, 34)')
++        ad["bar"] = classad.Value.Undefined
++        self.assertEqual(ad["foo"].eval(), classad.Value.Error)
++        self.assertNotEqual(ad["foo"].eval(), ad["bar"])
++        self.assertEqual(classad.Value.Undefined, ad["bar"])
++
++    def test_ad_iterator(self):
++        ad = classad.ClassAd()
++        ad["foo"] = 1
++        ad["bar"] = 2
++        self.assertEqual(len(ad), 2)
++        self.assertEqual(len(list(ad)), 2)
++        self.assertEqual(list(ad)[1], "foo")
++        self.assertEqual(list(ad)[0], "bar")
++        self.assertEqual(list(ad.items())[1][1], 1)
++        self.assertEqual(list(ad.items())[0][1], 2)
++        self.assertEqual(list(ad.values())[1], 1)
++        self.assertEqual(list(ad.values())[0], 2)
++
++    def test_ad_lookup(self):
++        ad = classad.ClassAd()
++        ad["foo"] = classad.Value.Error
++        self.assertTrue(isinstance(ad.lookup("foo"), classad.ExprTree))
++        self.assertEquals(ad.lookup("foo").eval(), classad.Value.Error)
++
++if __name__ == '__main__':
++    unittest.main()
++
+diff --git a/src/condor_contrib/python-bindings/tests/condor_tests.py b/src/condor_contrib/python-bindings/tests/condor_tests.py
+new file mode 100644
+index 0000000..2293fc2
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/tests/condor_tests.py
+@@ -0,0 +1,173 @@
++#!/usr/bin/python
++
++import os
++import re
++import time
++import condor
++import errno
++import signal
++import classad
++import unittest
++
++class TestConfig(unittest.TestCase):
++
++    def setUp(self):
++        os.environ["_condor_FOO"] = "BAR"
++        condor.reload_config()
++
++    def test_config(self):
++        self.assertEquals(condor.param["FOO"], "BAR")
++
++    def test_reconfig(self):
++        condor.param["FOO"] = "BAZ"
++        self.assertEquals(condor.param["FOO"], "BAZ")
++        os.environ["_condor_FOO"] = "1"
++        condor.reload_config()
++        self.assertEquals(condor.param["FOO"], "1")
++
++class TestVersion(unittest.TestCase):
++
++    def setUp(self):
++        fd = os.popen("condor_version")
++        self.lines = []
++        for line in fd.readlines():
++            self.lines.append(line.strip())
++        if fd.close():
++            raise RuntimeError("Unable to invoke condor_version")
++
++    def test_version(self):
++        self.assertEquals(condor.version(), self.lines[0])
++
++    def test_platform(self):
++        self.assertEquals(condor.platform(), self.lines[1])
++
++def makedirs_ignore_exist(directory):
++    try:
++        os.makedirs(directory)
++    except OSError, oe:
++        if oe.errno != errno.EEXIST:
++            raise
++
++def remove_ignore_missing(file):
++    try:
++        os.unlink(file)
++    except OSError, oe:
++        if oe.errno != errno.ENOENT:
++            raise
++
++class TestWithDaemons(unittest.TestCase):
++
++    def setUp(self):
++        self.pid = -1
++        testdir = os.path.join(os.getcwd(), "tests_tmp")
++        makedirs_ignore_exist(testdir)
++        os.environ["_condor_LOCAL_DIR"] = testdir
++        os.environ["_condor_LOG"] =  '$(LOCAL_DIR)/log'
++        os.environ["_condor_LOCK"] = '$(LOCAL_DIR)/lock'
++        os.environ["_condor_RUN"] = '$(LOCAL_DIR)/run'
++        os.environ["_condor_COLLECTOR_NAME"] = "python_classad_tests"
++        os.environ["_condor_SCHEDD_NAME"] = "python_classad_tests"
++        condor.reload_config()
++        condor.SecMan().invalidateAllSessions()
++
++    def launch_daemons(self, daemons=["MASTER", "COLLECTOR"]):
++        makedirs_ignore_exist(condor.param["LOG"])
++        makedirs_ignore_exist(condor.param["LOCK"])
++        makedirs_ignore_exist(condor.param["EXECUTE"])
++        makedirs_ignore_exist(condor.param["SPOOL"])
++        makedirs_ignore_exist(condor.param["RUN"])
++        remove_ignore_missing(condor.param["MASTER_ADDRESS_FILE"])
++        remove_ignore_missing(condor.param["COLLECTOR_ADDRESS_FILE"])
++        remove_ignore_missing(condor.param["SCHEDD_ADDRESS_FILE"])
++        if "COLLECTOR" in daemons:
++            os.environ["_condor_PORT"] = "9622"
++            os.environ["_condor_COLLECTOR_ARGS"] = "-port $(PORT)"
++            os.environ["_condor_COLLECTOR_HOST"] = "$(CONDOR_HOST):$(PORT)"
++        if 'MASTER' not in daemons:
++            daemons.append('MASTER')
++        os.environ["_condor_DAEMON_LIST"] = ", ".join(daemons)
++        condor.reload_config()
++        self.pid = os.fork()
++        if not self.pid:
++            try:
++                try:
++                    os.execvp("condor_master", ["condor_master", "-f"])
++                except Exception, e:
++                    print str(e)
++            finally:
++                os._exit(1)
++        for daemon in daemons:
++            self.waitLocalDaemon(daemon)
++
++    def tearDown(self):
++        if self.pid > 1:
++            os.kill(self.pid, signal.SIGQUIT)
++            pid, exit_status = os.waitpid(self.pid, 0)
++            self.assertTrue(os.WIFEXITED(exit_status))
++            code = os.WEXITSTATUS(exit_status)
++            self.assertEquals(code, 0)
++
++    def waitLocalDaemon(self, daemon, timeout=5):
++        address_file = condor.param[daemon + "_ADDRESS_FILE"]
++        for i in range(timeout):
++            if os.path.exists(address_file):
++                return
++            time.sleep(1)
++        if not os.path.exists(address_file):
++            raise RuntimeError("Waiting for daemon %s timed out." % daemon)
++
++    def waitRemoteDaemon(self, dtype, dname, pool=None, timeout=5):
++        if pool:
++            coll = condor.Collector(pool)
++        else:
++            coll = condor.Collector()
++        for i in range(timeout):
++            try:
++                return coll.locate(dtype, dname)
++            except Exception:
++                pass
++            time.sleep(1)
++        return coll.locate(dtype, dname)
++
++    def testDaemon(self):
++        self.launch_daemons(["COLLECTOR"])
++
++    def testLocate(self):
++        self.launch_daemons(["COLLECTOR"])
++        coll = condor.Collector()
++        coll_ad = coll.locate(condor.DaemonTypes.Collector)
++        self.assertTrue("MyAddress" in coll_ad)
++        self.assertEquals(coll_ad["Name"].split(":")[-1], os.environ["_condor_PORT"])
++
++    def testRemoteLocate(self):
++        self.launch_daemons(["COLLECTOR"])
++        coll = condor.Collector()
++        coll_ad = coll.locate(condor.DaemonTypes.Collector)
++        remote_ad = self.waitRemoteDaemon(condor.DaemonTypes.Collector, "%s@%s" % (condor.param["COLLECTOR_NAME"], condor.param["CONDOR_HOST"]))
++        self.assertEquals(remote_ad["MyAddress"], coll_ad["MyAddress"])
++
++    def testScheddLocate(self):
++        self.launch_daemons(["SCHEDD", "COLLECTOR"])
++        coll = condor.Collector()
++        name = "%s@%s" % (condor.param["SCHEDD_NAME"], condor.param["CONDOR_HOST"])
++        schedd_ad = self.waitRemoteDaemon(condor.DaemonTypes.Schedd, name, timeout=10)
++        self.assertEquals(schedd_ad["Name"], name)
++
++    def testCollectorAdvertise(self):
++        self.launch_daemons(["COLLECTOR"])
++        print condor.param["COLLECTOR_HOST"]
++        coll = condor.Collector()
++        now = time.time()
++        ad = classad.ClassAd('[MyType="GenericAd"; Name="Foo"; Foo=1; Bar=%f; Baz="foo"]' % now) 
++        coll.advertise([ad])
++        for i in range(5):
++            ads = coll.query(condor.AdTypes.Any, 'Name =?= "Foo"', ["Bar"])
++            if ads: break
++            time.sleep
++        self.assertEquals(len(ads), 1)
++        self.assertEquals(ads[0]["Bar"], now)
++        self.assertTrue("Foo" not in ads[0])
++
++if __name__ == '__main__':
++    unittest.main()
++
+diff --git a/src/condor_contrib/python-bindings/tests/test.ad b/src/condor_contrib/python-bindings/tests/test.ad
+new file mode 100644
+index 0000000..06eeeb5
+--- /dev/null
++++ b/src/condor_contrib/python-bindings/tests/test.ad
+@@ -0,0 +1,4 @@
++[
++foo = "bar";
++baz = undefined;
++]
