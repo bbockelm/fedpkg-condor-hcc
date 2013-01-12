@@ -1,4 +1,4 @@
-%define tarball_version 7.9.3
+%define tarball_version 7.9.4
 
 %define _default_patch_fuzz 2
 
@@ -32,13 +32,14 @@
 %define blahp 1
 %define glexec 1
 %define cream 1
+%define python 1
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 7259c08
+%define git_rev b65589d
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -48,7 +49,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: %{tarball_version}
-%define condor_base_release 0.13
+%define condor_base_release 0.3
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git.lark
 %else
@@ -119,7 +120,7 @@ Patch3: wso2-axis2.patch
 Patch4: condor_pid_namespaces_v7.patch
 Patch5: condor-gahp.patch
 #Patch6: cgahp_scaling.patch
-Patch7: condor-1605-v4.patch
+#Patch7: condor-1605-v4.patch
 #Patch7: condor_host_alias_patch.txt
 Patch8: lcmaps_env_in_init_script.patch
 # See gt3158
@@ -127,6 +128,7 @@ Patch9: 0001-Apply-the-user-s-condor_config-last-rather-than-firs.patch
 Patch11: condor_oom_v3.patch
 # From ZKM
 #Patch12: zkm-782.patch
+Patch13: python-bindings-v1.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -206,6 +208,12 @@ BuildRequires: gridsite-devel
 
 %if %blahp
 Requires: blahp >= 1.16.1
+%endif
+
+%if %python
+BuildRequires: python-devel
+BuildRequires: boost-devel
+BuildRequires: boost-python
 %endif
 
 %if %systemd
@@ -394,6 +402,18 @@ The cream_gahp enables the Condor grid universe to communicate with a remote
 CREAM server.
 %endif
 
+%if %python
+#######################
+%package python
+Summary: Python bindings for Condor.
+Group: Applications/System
+Requires: %name = %version-%release
+
+%description python
+The python bindings allow one to directly invoke the C++ implementations of
+the ClassAd library and HTCondor from python
+%endif
+
 #######################
 %package bosco
 Summary: BOSCO, a Condor overlay system for managing jobs at remote clusters
@@ -438,6 +458,9 @@ exit 0
 %patch9 -p1
 #%patch10 -p1
 #%patch11 -p1
+%if %python
+%patch13 -p1
+%endif
 
 %if %systemd
 cp %{SOURCE2} %{name}-tmpfiles.conf
@@ -508,6 +531,11 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_LIBDELTACLOUD:BOOL=FALSE \
 %endif
        -DWITH_GLOBUS:BOOL=TRUE \
+%if %python
+       -DWITH_PYTHON_BINDINGS:BOOL=TRUE \
+%else
+       -DWITH_PYTHON_BINDINGS:BOOL=FALSE \
+%endif
 %if %cgroups
        -DLIBCGROUP_FOUND_SEARCH_cgroup=/%{_lib}/libcgroup.so.1 \
 %endif
@@ -651,6 +679,12 @@ cp %{name}-lcmaps-env.sysconfig %{buildroot}/%{_sysconfdir}/sysconfig/%{name}-lc
 install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
 %endif
 
+%if %python
+mkdir -p %{buildroot}%{python_sitearch}
+install -m 0755 src/condor_contrib/python-bindings/{classad,condor}.so %{buildroot}%{python_sitearch}
+install -m 0755 src/condor_contrib/python-bindings/libpyclassad.so %{buildroot}%{_libdir}
+%endif
+
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
 
@@ -711,6 +745,8 @@ rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
 # Remove some cluster suite stuff which doesn't work in 
 #rm -f %{buildroot}/etc/examples/cmd_cluster.rb
 #rm -f %{buildroot}/etc/examples/condor.sh
+#rm -rf %{buildroot}%{_libdir}/{condor,libpyclassad,classad}.so
+rm -rf %{buildroot}%{_datadir}/condor/{condor,libpyclassad,classad}.so
 
 rm %{buildroot}%{_libexecdir}/condor/condor_schedd.init
 
@@ -867,7 +903,6 @@ rm -rf %{buildroot}
 %_bindir/condor_continue
 %_bindir/condor_suspend
 %_bindir/condor_test_match
-%_bindir/condor_glidein
 %_bindir/condor_drain
 %_bindir/condor_who
 # sbin/condor is a link for master_off, off, on, reconfig,
@@ -1097,6 +1132,14 @@ rm -rf %{buildroot}
 %_sbindir/cream_gahp
 %endif
 
+%if %python
+%files python
+%defattr(-,root,root,-)
+%_libdir/libpyclassad.so
+%{python_sitearch}/classad.so
+%{python_sitearch}/condor.so
+%endif
+
 %files bosco
 %defattr(-,root,root,-)
 %config(noreplace) %_sysconfdir/condor/campus_factory.conf
@@ -1111,7 +1154,9 @@ rm -rf %{buildroot}
 %_bindir/bosco_ssh_start
 %_bindir/bosco_start
 %_bindir/bosco_stop
+%_bindir/bosco_findplatform
 %_bindir/bosco_uninstall
+%_sbindir/glidein_creation
 %_datadir/condor/campus_factory
 %{python_sitelib}/GlideinWMS
 %{python_sitelib}/campus_factory
@@ -1169,6 +1214,9 @@ fi
 %endif
 
 %changelog
+* Thu Jan  2 2013 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.4-0.1.dce3324.git
+- Add support for python bindings.
+
 * Thu Dec  6 2012 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.3-0.6.ce12f50.git
 - Fix compile for CREAM.
 
