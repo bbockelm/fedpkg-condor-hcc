@@ -42,7 +42,7 @@ Version: 7.9.1
 %else
 	%define condor_release %condor_base_release
 %endif
-Release: %condor_release%{?dist}.3
+Release: %condor_release%{?dist}.4
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -1035,6 +1035,9 @@ fi
 %endif
 
 %changelog
+* Sat Feb 09 2013 Denis Arnaud <denis.arnaud_fedora@m4x.org> - 7.9.1-0.1.4
+- Rebuild for Boost-1.53.0
+
 * Thu Aug 16 2012 <tstclair@redhat.com> - 7.9.1-0.1
 - Fast forward to 7.9.1 pre-release
 - Fix CVE-2012-3416
