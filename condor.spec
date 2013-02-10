@@ -42,7 +42,7 @@ Version: 7.9.1
 %else
 	%define condor_release %condor_base_release
 %endif
-Release: %condor_release%{?dist}.4
+Release: %condor_release%{?dist}.5
 License: ASL 2.0
 Group: Applications/System
 URL: http://www.cs.wisc.edu/condor/
@@ -1035,6 +1035,9 @@ fi
 %endif
 
 %changelog
+* Sun Feb 10 2013 Denis Arnaud <denis.arnaud_fedora@m4x.org> - 7.9.1-0.1.5
+- Rebuild for Boost-1.53.0
+
 * Sat Feb 09 2013 Denis Arnaud <denis.arnaud_fedora@m4x.org> - 7.9.1-0.1.4
 - Rebuild for Boost-1.53.0
 
