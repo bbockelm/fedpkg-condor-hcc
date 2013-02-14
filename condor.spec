@@ -32,14 +32,13 @@
 %define blahp 1
 %define glexec 1
 %define cream 1
-%define python 1
 
 # These flags are meant for developers; it allows one to build Condor
 # based upon a git-derived tarball, instead of an upstream release tarball
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev dce3324
+%define git_rev d028b17
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -49,7 +48,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: %{tarball_version}
-%define condor_base_release 0.1
+%define condor_base_release 0.4
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
 %else
@@ -128,7 +127,6 @@ Patch9: 0001-Apply-the-user-s-condor_config-last-rather-than-firs.patch
 Patch11: condor_oom_v3.patch
 # From ZKM
 #Patch12: zkm-782.patch
-Patch13: python-bindings-v1.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -210,11 +208,9 @@ BuildRequires: gridsite-devel
 Requires: blahp >= 1.16.1
 %endif
 
-%if %python
 BuildRequires: python-devel
 BuildRequires: boost-devel
 BuildRequires: boost-python
-%endif
 
 %if %systemd
 BuildRequires: systemd-units
@@ -402,7 +398,6 @@ The cream_gahp enables the Condor grid universe to communicate with a remote
 CREAM server.
 %endif
 
-%if %python
 #######################
 %package python
 Summary: Python bindings for Condor.
@@ -412,7 +407,6 @@ Requires: %name = %version-%release
 %description python
 The python bindings allow one to directly invoke the C++ implementations of
 the ClassAd library and HTCondor from python
-%endif
 
 #######################
 %package bosco
@@ -451,16 +445,13 @@ exit 0
 %patch1 -p1
 %patch2 -p1
 %patch3 -p0
-%patch4 -p1
+#%patch4 -p1
 %patch5 -p1
 #%patch6 -p1
 #%patch7 -p1
 %patch9 -p1
 #%patch10 -p1
-%patch11 -p1
-%if %python
-%patch13 -p1
-%endif
+#%patch11 -p1
 
 %if %systemd
 cp %{SOURCE2} %{name}-tmpfiles.conf
@@ -531,11 +522,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_LIBDELTACLOUD:BOOL=FALSE \
 %endif
        -DWITH_GLOBUS:BOOL=TRUE \
-%if %python
        -DWITH_PYTHON_BINDINGS:BOOL=TRUE \
-%else
-       -DWITH_PYTHON_BINDINGS:BOOL=FALSE \
-%endif
 %if %cgroups
        -DLIBCGROUP_FOUND_SEARCH_cgroup=/%{_lib}/libcgroup.so.1
 %endif
@@ -678,11 +665,9 @@ cp %{name}-lcmaps-env.sysconfig %{buildroot}/%{_sysconfdir}/sysconfig/%{name}-lc
 install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
 %endif
 
-%if %python
 mkdir -p %{buildroot}%{python_sitearch}
 install -m 0755 src/condor_contrib/python-bindings/{classad,condor}.so %{buildroot}%{python_sitearch}
-install -m 0755 src/condor_contrib/python-bindings/libpyclassad.so %{buildroot}%{_libdir}
-%endif
+install -m 0755 src/condor_contrib/python-bindings/libpyclassad_7_9_4.so %{buildroot}%{_libdir}
 
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
@@ -744,8 +729,8 @@ rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
 # Remove some cluster suite stuff which doesn't work in 
 #rm -f %{buildroot}/etc/examples/cmd_cluster.rb
 #rm -f %{buildroot}/etc/examples/condor.sh
-#rm -rf %{buildroot}%{_libdir}/{condor,libpyclassad,classad}.so
-rm -rf %{buildroot}%{_datadir}/condor/{condor,libpyclassad,classad}.so
+rm -rf %{buildroot}%{_datadir}/condor/python/{condor,classad}.so
+rm -rf %{buildroot}%{_datadir}/condor/{libpyclassad_7_9_4,condor,classad}.so
 
 rm %{buildroot}%{_libexecdir}/condor/condor_schedd.init
 
@@ -938,6 +923,7 @@ rm -rf %{buildroot}
 %_sbindir/grid_monitor.sh
 %_sbindir/remote_gahp
 %_sbindir/nordugrid_gahp
+%_sbindir/condor_gpu_discovery
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
@@ -1001,6 +987,7 @@ rm -rf %{buildroot}
 %_datadir/condor/aviary/submission_ids.py*
 %_datadir/condor/aviary/submit.py*
 %_datadir/condor/aviary/setattr.py*
+%_datadir/condor/aviary/subinventory.py*
 %dir %_datadir/condor/aviary/dag
 %_datadir/condor/aviary/dag/diamond.dag
 %_datadir/condor/aviary/dag/dag-submit.py*
@@ -1127,13 +1114,11 @@ rm -rf %{buildroot}
 %_sbindir/cream_gahp
 %endif
 
-%if %python
 %files python
 %defattr(-,root,root,-)
-%_libdir/libpyclassad.so
+%_libdir/libpyclassad_7_9_4.so
 %{python_sitearch}/classad.so
 %{python_sitearch}/condor.so
-%endif
 
 %files bosco
 %defattr(-,root,root,-)
@@ -1209,6 +1194,9 @@ fi
 %endif
 
 %changelog
+* Sat Feb  2 2013 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.4-0.4.d028b17.git
+- Re-sync with master.
+
 * Thu Jan  2 2013 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.4-0.1.dce3324.git
 - Add support for python bindings.
 
