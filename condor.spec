@@ -1,4 +1,4 @@
-%define tarball_version 7.9.4
+%define tarball_version 7.9.5
 
 %define _default_patch_fuzz 2
 
@@ -38,7 +38,7 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev d028b17
+%define git_rev 4e2a2ef
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -48,7 +48,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: %{tarball_version}
-%define condor_base_release 0.4
+%define condor_base_release 0.1
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
 %else
@@ -666,8 +666,8 @@ install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/
 %endif
 
 mkdir -p %{buildroot}%{python_sitearch}
-install -m 0755 src/condor_contrib/python-bindings/{classad,condor}.so %{buildroot}%{python_sitearch}
-install -m 0755 src/condor_contrib/python-bindings/libpyclassad_7_9_4.so %{buildroot}%{_libdir}
+install -m 0755 src/condor_contrib/python-bindings/{classad,htcondor}.so %{buildroot}%{python_sitearch}
+install -m 0755 src/condor_contrib/python-bindings/libpyclassad_*.so %{buildroot}%{_libdir}
 
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
@@ -729,8 +729,8 @@ rm -rf %{buildroot}%{_datadir}/condor/libcondorapi.a
 # Remove some cluster suite stuff which doesn't work in 
 #rm -f %{buildroot}/etc/examples/cmd_cluster.rb
 #rm -f %{buildroot}/etc/examples/condor.sh
-rm -rf %{buildroot}%{_datadir}/condor/python/{condor,classad}.so
-rm -rf %{buildroot}%{_datadir}/condor/{libpyclassad_7_9_4,condor,classad}.so
+rm -rf %{buildroot}%{_datadir}/condor/python/{htcondor,classad}.so
+rm -rf %{buildroot}%{_datadir}/condor/{libpyclassad_*,htcondor,classad}.so
 
 rm %{buildroot}%{_libexecdir}/condor/condor_schedd.init
 
@@ -923,7 +923,7 @@ rm -rf %{buildroot}
 %_sbindir/grid_monitor.sh
 %_sbindir/remote_gahp
 %_sbindir/nordugrid_gahp
-%_sbindir/condor_gpu_discovery
+%_libexecdir/condor/condor_gpu_discovery
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
 %dir %_var/lib/condor/execute/
@@ -1116,9 +1116,9 @@ rm -rf %{buildroot}
 
 %files python
 %defattr(-,root,root,-)
-%_libdir/libpyclassad_7_9_4.so
+%_libdir/libpyclassad_*.so
 %{python_sitearch}/classad.so
-%{python_sitearch}/condor.so
+%{python_sitearch}/htcondor.so
 
 %files bosco
 %defattr(-,root,root,-)
@@ -1194,6 +1194,10 @@ fi
 %endif
 
 %changelog
+* Thu Feb 14 2013 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.5-0.1.4e2a2ef.git
+- Re-sync with master.
+- Use upstream python bindings.
+
 * Sat Feb  2 2013 Brian Bockelman <bbockelm@cse.unl.edu> - 7.9.4-0.4.d028b17.git
 - Re-sync with master.
 
