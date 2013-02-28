@@ -1,4 +1,4 @@
-%define tarball_version 7.9.1
+%define tarball_version 7.9.5
 
 # Things for F15 or later
 %if 0%{?fedora} >= 16
@@ -12,14 +12,12 @@
 %endif
 %define systemd 1
 %define cgroups 1
-%define qmf 1
 %else
 %define deltacloud 0
 %define aviary 0
 %define plumage 0
 %define systemd 0
 %define cgroups 0
-%define qmf 0
 %endif
 
 # Things not turned on, or don't have Fedora packages yet
@@ -35,7 +33,7 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.9.1
+Version: 7.9.5
 %define condor_base_release 0.1
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}git
@@ -88,9 +86,10 @@ Source0: condor.tar.gz
 #   32727366db9d0dcd57f5a41f2352f40d  condor_src-7.7.5-all-all.tar.gz
 #   5306421d1b937233b6f07caea9872e29  condor_src-7.9.0-all-all.tar.gz
 #   8f6ba9377309d0d961de538224664f5b  condor_src-7.9.1-all-all.tar.gz
+#   361ef1a724335189088ec9f7ac2b25a7  condor_src-7.9.5-all-all.tar.gz
 #
 # Note: The md5sum of each generated tarball may be different
-Source0: condor-7.9.1-83a2a073-RH.tar.gz
+Source0: condor-7.9.5-8015f029-RH.tar.gz
 Source1: generate-tarball.sh
 %endif
 
@@ -115,7 +114,6 @@ BuildRequires: /usr/include/curl/curl.h
 BuildRequires: /usr/include/expat.h
 BuildRequires: openldap-devel
 BuildRequires: /usr/include/ldap.h
-BuildRequires: qpid-qmf-devel
 BuildRequires: latex2html
 
 # Globus GSI build requirements
@@ -143,10 +141,6 @@ BuildRequires: globus-ftp-client-devel
 BuildRequires: globus-ftp-control-devel
 BuildRequires: libtool-ltdl-devel
 BuildRequires: voms-devel
-
-%if %qmf
-BuildRequires: qpid-qmf-devel
-%endif
 
 %if %deltacloud
 BuildRequires: %_includedir/libdeltacloud/libdeltacloud.h
@@ -208,52 +202,69 @@ Requires(postun):/sbin/service
 Obsoletes: condor-static < 7.2.0
 
 %description
-Condor is a specialized workload management system for
-compute-intensive jobs. Like other full-featured batch systems, Condor
+HTCondor is a workload management system for high-throughput and
+high-performance jobs. Like other full-featured batch systems, HTCondor
 provides a job queueing mechanism, scheduling policy, priority scheme,
 resource monitoring, and resource management. Users submit their
-serial or parallel jobs to Condor, Condor places them into a queue,
+serial or parallel jobs to HTCondor, HTCondor places them into a queue,
 chooses when and where to run the jobs based upon a policy, carefully
 monitors their progress, and ultimately informs the user upon
 completion.
 
+#######################
 %package procd
-Summary: Condor Process tracking Daemon
+Summary: HTCondor Process tracking Daemon
 Group: Applications/System
 %description procd
 A daemon for tracking child processes started by a parent.
-Part of Condor, but able to be stand-alone
-
-#######################
-%if %qmf
-%package qmf
-Summary: Condor QMF components
-Group: Applications/System
-Requires: %name = %version-%release
-#Requires: qmf >= %{qmf_version}
-Requires: python-qmf >= 0.7.946106
-Requires: condor-classads = %{version}-%{release}
-Obsoletes: condor-qmf-plugins
-
-%description qmf
-Components to connect Condor to the QMF management bus.
-%endif
+Part of HTCondor, but able to be stand-alone
 
 #######################
 %if %aviary
-%package aviary
-Summary: Condor Aviary components
+%package aviary-common
+Summary: HTCondor Aviary development components
 Group: Applications/System
 Requires: %name = %version-%release
-Requires: condor-classads = %{version}-%{release}
+Requires: python-suds >= 0.4.1
+
+%description aviary-common
+Components to develop against simplified WS interface to HTCondor.
+
+%package aviary
+Summary: HTCondor Aviary components
+Group: Applications/System
+Requires: %name = %version-%release
+Requires: condor = %{version}-%{release}
+Requires: condor-aviary-common = %{version}-%{release}
 
 %description aviary
-Components to provide simplified WS interface to Condor.
+Components to provide simplified WS interface to HTCondor.
+
+%package aviary-hadoop-common
+Summary: HTCondor Aviary Hadoop development components
+Group: Applications/System
+Requires: %name = %version-%release
+Requires: python-suds >= 0.4.1
+Requires: condor-aviary-common = %{version}-%{release}
+
+%description aviary-hadoop-common
+Components to develop against simplified WS interface to HTCondor.
+
+%package aviary-hadoop
+Summary: HTCondor Aviary Hadoop components
+Group: Applications/System
+Requires: %name = %version-%release
+Requires: condor-aviary = %{version}-%{release}
+Requires: condor-aviary-hadoop-common = %{version}-%{release}
+
+%description aviary-hadoop
+Aviary Hadoop plugin and components.
 %endif
 
+#######################
 %if %plumage
 %package plumage
-Summary: Condor Plumage components
+Summary: HTCondor Plumage components
 Group: Applications/System
 Requires: %name = %version-%release
 Requires: condor-classads = %{version}-%{release}
@@ -262,15 +273,15 @@ Requires: pymongo >= 1.9
 Requires: python-dateutil >= 1.4.1
 
 %description plumage
-Components to provide a NoSQL operational data store for Condor.
+Components to provide a NoSQL operational data store for HTCondor.
 %endif
 
 #######################
 %package kbdd
-Summary: Condor Keyboard Daemon
+Summary: HTCondor Keyboard Daemon
 Group: Applications/System
 Requires: %name = %version-%release
-Requires: condor-classads = %{version}-%{release}
+Requires: condor = %{version}-%{release}
 
 %description kbdd
 The condor_kbdd monitors logged in X users for activity. It is only
@@ -279,40 +290,41 @@ determine console idle time.
 
 #######################
 %package vm-gahp
-Summary: Condor's VM Gahp
+Summary: HTCondor's VM Gahp
 Group: Applications/System
 Requires: %name = %version-%release
 Requires: libvirt
-Requires: condor-classads = %{version}-%{release}
+Requires: condor = %{version}-%{release}
 
 %description vm-gahp
 The condor_vm-gahp enables the Virtual Machine Universe feature of
-Condor. The VM Universe uses libvirt to start and control VMs under
-Condor's Startd.
+HTCondor. The VM Universe uses libvirt to start and control VMs under
+HTCondor's Startd.
 
 #######################
 %if %deltacloud
 %package deltacloud-gahp
-Summary: Condor's Deltacloud Gahp
+Summary: HTCondor's Deltacloud Gahp
 Group: Applications/System
 Requires: %name = %version-%release
+Requires: condor = %{version}-%{release}
 
 %description deltacloud-gahp
-The deltacloud_gahp enables Condor's ability to manage jobs run on
+The deltacloud_gahp enables HTCondor's ability to manage jobs run on
 resources exposed by the deltacloud API.
 %endif
 
 #######################
 %package classads
-Summary: Condor's classified advertisement language
+Summary: HTCondor's classified advertisement language
 Group: Development/Libraries
 Obsoletes: classads <= 1.0.8
 Obsoletes: classads-static <= 1.0.8
 
 %description classads
 Classified Advertisements (classads) are the lingua franca of
-Condor. They are used for describing jobs, workstations, and other
-resources. They are exchanged by Condor processes to schedule
+HTCondor. They are used for describing jobs, workstations, and other
+resources. They are exchanged by HTCondor processes to schedule
 jobs. They are logged to files for statistical and debugging
 purposes. They are used to enquire about current state of the system.
 
@@ -326,20 +338,19 @@ evaluates to true if the other ad has an attribute named size and the
 value of that attribute is (or evaluates to) an integer greater than
 three. Two classads match if each ad has an attribute requirements
 that evaluates to true in the context of the other ad. Classad
-matching is used by the Condor central manager to determine the
+matching is used by the HTCondor central manager to determine the
 compatibility of jobs and workstations where they may be run.
-
 
 #######################
 %package classads-devel
-Summary: Headers for Condor's classified advertisement language
+Summary: Headers for HTCondor's classified advertisement language
 Group: Development/System
 Requires: %name-classads = %version-%release
 Requires: pcre-devel
 Obsoletes: classads-devel <= 1.0.8
 
 %description classads-devel
-Header files for Condor's ClassAd Library, a powerful and flexible,
+Header files for HTCondor's ClassAd Library, a powerful and flexible,
 semi-structured representation of data.
 
 
@@ -347,7 +358,7 @@ semi-structured representation of data.
 getent group condor >/dev/null || groupadd -r condor
 getent passwd condor >/dev/null || \
   useradd -r -g condor -d %_var/lib/condor -s /sbin/nologin \
-    -c "Owner of Condor Daemons" condor
+    -c "Owner of HTCondor Daemons" condor
 exit 0
 
 
@@ -365,6 +376,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 %build
 
 %cmake -DNO_PHONE_HOME:BOOL=TRUE \
+       -DBUILDID:STRING=RH-%{version}-%{release} \
        -D_VERBOSE:BOOL=TRUE \
        -DHAVE_BACKFILL:BOOL=FALSE \
        -DHAVE_BOINC:BOOL=FALSE \
@@ -375,10 +387,12 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWANT_LEASE_MANAGER:BOOL=FALSE \
        -DWANT_HDFS:BOOL=FALSE \
        -DWANT_QUILL:BOOL=FALSE \
+       -DWITH_QPID:BOOL=FALSE \
        -DWITH_ZLIB:BOOL=FALSE \
        -DWITH_POSTGRESQL:BOOL=FALSE \
        -DWANT_CONTRIB:BOOL=ON \
        -DWITH_PIGEON:BOOL=FALSE \
+       -DWITH_MANAGEMENT:BOOL=TRUE \
 %if %plumage
        -DWITH_PLUMAGE:BOOL=TRUE \
 %else
@@ -388,13 +402,6 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
        -DWITH_AVIARY:BOOL=TRUE \
 %else
        -DWITH_AVIARY:BOOL=FALSE \
-%endif
-%if %qmf
-       -DWITH_TRIGGERD:BOOL=TRUE \
-       -DWITH_MANAGEMENT:BOOL=TRUE \
-%else
-       -DWITH_TRIGGERD:BOOL=FALSE \
-       -DWITH_MANAGEMENT:BOOL=FALSE \
 %endif
        -DWANT_FULL_DEPLOYMENT:BOOL=TRUE \
 %if %glexec
@@ -413,8 +420,7 @@ find src -perm /a+x -type f -name "*.[Cch]" -exec chmod a-x {} \;
 	-DWITH_LIBCGROUP:BOOL=TRUE
 %endif
 
-make 
-#%{?_smp_mflags}
+make %{?_smp_mflags}
 
 
 %install
@@ -441,11 +447,12 @@ populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.s*
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libcondor_utils*.so
 rm -f %{buildroot}/%{_datadir}/condor/libclassad.a
 
-%if %aviary || %qmf
+%if %aviary
 populate %{_libdir}/condor/plugins %{buildroot}/%{_usr}/libexec/*-plugin.so
+populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libaviary_*.so
 %endif
 
-# It is proper to put Condor specific libexec binaries under libexec/condor/
+# It is proper to put HTCondor specific libexec binaries under libexec/condor/
 populate %_libexecdir/condor %{buildroot}/usr/libexec/*
 
 # man pages go under %{_mandir}
@@ -471,19 +478,14 @@ sed -e "s:^LIB\s*=.*:LIB = \$(RELEASE_DIR)/$LIB/condor:" \
   > %{buildroot}/%{_sysconfdir}/condor/condor_config
 
 
-# Install the basic configuration, a Personal Condor config. Allows for
+# Install the basic configuration, a Personal HTCondor config. Allows for
 # yum install condor + service condor start and go.
 mkdir -m0755 %{buildroot}/%{_sysconfdir}/condor/config.d
 cp %{buildroot}/etc/examples/condor_config.local %{buildroot}/%{_sysconfdir}/condor/config.d/00personal_condor.config
 
-%if %qmf
-# Install condor-qmf's base plugin configuration
-populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/60condor-qmf.config
-%endif
-
 %if %aviary
-# Install condor-aviary's base plugin configuration
 populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/61aviary.config
+populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/63aviary-hadoop.config
 
 mkdir -p %{buildroot}/%{_var}/lib/condor/aviary
 populate %{_var}/lib/condor/aviary %{buildroot}/usr/axis2.xml
@@ -558,8 +560,7 @@ touch %{buildroot}/%{_sysconfdir}/sysconfig/condor
 install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/condor
 %endif
 
-# we must place the config examples in builddir so %doc can find them
-mv -f %{buildroot}/etc/examples %{_builddir}/%{name}-%{tarball_version}
+
 
 # rsh is built if glexec is on.  No. Clue. Why.
 %if %glexec
@@ -614,13 +615,14 @@ rm -rf %{buildroot}%{_includedir}/write_user_log.h
 rm -rf %{buildroot}%{_libexecdir}/condor/bgp_*
 rm -rf %{buildroot}%{_datadir}/condor/libchirp_client.*
 rm -rf %{buildroot}%{_datadir}/condor/libcondorapi*
-# Remove some cluster suite stuff which doesn't work in 
+
+rm -rf %{buildroot}/etc/examples
+# Remove some cluster suite stuff - dep on wallaby
 #rm -f %{buildroot}/etc/examples/cmd_cluster.rb
 #rm -f %{buildroot}/etc/examples/condor.sh
 
 %clean
 rm -rf %{buildroot}
-
 
 %check
 # This currently takes hours and can kill your machine...
@@ -728,7 +730,7 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_router_rm.1.gz
 
 # bin/condor is a link for checkpoint, reschedule, vacate
-%_libdir/libcondor_utils_7_9_1.so
+%_libdir/libcondor_utils_7_9_5.so
 #%_bindir/condor
 %_bindir/condor_submit_dag
 %_bindir/condor_who
@@ -767,7 +769,7 @@ rm -rf %{buildroot}
 %_bindir/condor_continue
 %_bindir/condor_suspend
 %_bindir/condor_test_match
-%_bindir/condor_glidein
+#%_bindir/condor_glidein
 %_bindir/condor_drain
 # sbin/condor is a link for master_off, off, on, reconfig,
 # reconfig_schedd, restart
@@ -813,6 +815,7 @@ rm -rf %{buildroot}
 %ghost %dir %_var/lock/condor/
 %ghost %dir %_var/run/condor/
 
+#################
 %files procd
 %_sbindir/condor_procd
 %_sbindir/gidd_alloc
@@ -822,42 +825,21 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_procd.1.gz
 
 #################
-%if %qmf
-%files qmf
-%defattr(-,root,root,-)
-%doc LICENSE-2.0.txt NOTICE.txt
-%_sysconfdir/condor/config.d/60condor-qmf.config
-%dir %_libdir/condor/plugins
-%_libdir/condor/plugins/MgmtCollectorPlugin-plugin.so
-%_libdir/condor/plugins/MgmtMasterPlugin-plugin.so
-%_libdir/condor/plugins/MgmtNegotiatorPlugin-plugin.so
-%_libdir/condor/plugins/MgmtScheddPlugin-plugin.so
-%_libdir/condor/plugins/MgmtStartdPlugin-plugin.so
-%_bindir/get_trigger_data
-%_sbindir/condor_trigger_config
-%_sbindir/condor_triggerd
-%_sbindir/condor_job_server
-%endif
-
-#################
 %if %aviary
-%files aviary
+%files aviary-common
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
-%_sysconfdir/condor/config.d/61aviary.config
-%dir %_libdir/condor/plugins
-%_libdir/condor/plugins/AviaryScheddPlugin-plugin.so
-%_libdir/condor/plugins/AviaryLocatorPlugin-plugin.so
-%_sbindir/aviary_query_server
 %dir %_datadir/condor/aviary
 %_datadir/condor/aviary/jobcontrol.py*
-%_datadir/condor/aviary/jobinventory.py*
 %_datadir/condor/aviary/jobquery.py*
-%_datadir/condor/aviary/locator.py*
 %_datadir/condor/aviary/submissions.py*
 %_datadir/condor/aviary/submission_ids.py*
+%_datadir/condor/aviary/subinventory.py*
 %_datadir/condor/aviary/submit.py*
 %_datadir/condor/aviary/setattr.py*
+%_datadir/condor/aviary/jobinventory.py*
+%_datadir/condor/aviary/locator.py*
+%_datadir/condor/aviary/collector_tool.py*
 %dir %_datadir/condor/aviary/dag
 %_datadir/condor/aviary/dag/diamond.dag
 %_datadir/condor/aviary/dag/dag-submit.py*
@@ -867,45 +849,86 @@ rm -rf %{buildroot}
 %_datadir/condor/aviary/module/aviary/https.py*
 %_datadir/condor/aviary/module/aviary/__init__.py*
 %_datadir/condor/aviary/README
-%defattr(-,condor,condor,-)
 %dir %_var/lib/condor/aviary
 %_var/lib/condor/aviary/axis2.xml
 %dir %_var/lib/condor/aviary/services
 %dir %_var/lib/condor/aviary/services/job
-%_var/lib/condor/aviary/services/job/libaviary_job_axis.so
 %_var/lib/condor/aviary/services/job/services.xml
 %_var/lib/condor/aviary/services/job/aviary-common.xsd
 %_var/lib/condor/aviary/services/job/aviary-job.xsd
 %_var/lib/condor/aviary/services/job/aviary-job.wsdl
 %dir %_var/lib/condor/aviary/services/query
-%_var/lib/condor/aviary/services/query/libaviary_query_axis.so
 %_var/lib/condor/aviary/services/query/services.xml
 %_var/lib/condor/aviary/services/query/aviary-common.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.xsd
 %_var/lib/condor/aviary/services/query/aviary-query.wsdl
-%_var/lib/condor/aviary/services/locator/aviary-common.xsd
-%_var/lib/condor/aviary/services/locator/aviary-locator.wsdl
-%_var/lib/condor/aviary/services/locator/aviary-locator.xsd
-%_var/lib/condor/aviary/services/locator/libaviary_locator_axis.so
+%dir %_var/lib/condor/aviary/services/locator
 %_var/lib/condor/aviary/services/locator/services.xml
+%_var/lib/condor/aviary/services/locator/aviary-common.xsd
+%_var/lib/condor/aviary/services/locator/aviary-locator.xsd
+%_var/lib/condor/aviary/services/locator/aviary-locator.wsdl
+%dir %_var/lib/condor/aviary/services/collector
+%_var/lib/condor/aviary/services/collector/services.xml
+%_var/lib/condor/aviary/services/collector/aviary-common.xsd
+%_var/lib/condor/aviary/services/collector/aviary-collector.xsd
+%_var/lib/condor/aviary/services/collector/aviary-collector.wsdl
+
+%files aviary
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_sysconfdir/condor/config.d/61aviary.config
+%_libdir/libaviary_axis_provider.so
+%_libdir/libaviary_wso2_common.so
+%dir %_libdir/condor/plugins
+%_libdir/condor/plugins/AviaryScheddPlugin-plugin.so
+%_libdir/condor/plugins/AviaryLocatorPlugin-plugin.so
+%_libdir/condor/plugins/AviaryCollectorPlugin-plugin.so
+%_sbindir/aviary_query_server
+%_var/lib/condor/aviary/services/job/libaviary_job_axis.so
+%_var/lib/condor/aviary/services/query/libaviary_query_axis.so
+%_var/lib/condor/aviary/services/locator/libaviary_locator_axis.so
+%_var/lib/condor/aviary/services/collector/libaviary_collector_axis.so
+
+%files aviary-hadoop-common
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_var/lib/condor/aviary/services/hadoop/services.xml
+%_var/lib/condor/aviary/services/hadoop/aviary-common.xsd
+%_var/lib/condor/aviary/services/hadoop/aviary-hadoop.xsd
+%_var/lib/condor/aviary/services/hadoop/aviary-hadoop.wsdl
+%_datadir/condor/aviary/hadoop_tool.py*
+
+%files aviary-hadoop
+%defattr(-,root,root,-)
+%doc LICENSE-2.0.txt NOTICE.txt
+%_var/lib/condor/aviary/services/hadoop/libaviary_hadoop_axis.so
+%_libdir/condor/plugins/AviaryHadoopPlugin-plugin.so
+%_sysconfdir/condor/config.d/63aviary-hadoop.config
+%_datadir/condor/aviary/hdfs_datanode.sh
+%_datadir/condor/aviary/hdfs_namenode.sh
+%_datadir/condor/aviary/mapred_jobtracker.sh
+%_datadir/condor/aviary/mapred_tasktracker.sh
 %endif
 
+#################
 %if %plumage
 %files plumage
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
 %_sysconfdir/condor/config.d/62plumage.config
 %dir %_libdir/condor/plugins
-%_libdir/condor/plugins/ODSCollectorPlugin-plugin.so
+%_libdir/condor/plugins/PlumageCollectorPlugin-plugin.so
 %dir %_datadir/condor/plumage
+%_sbindir/plumage_job_etl_server
+%_bindir/plumage_history_load
 %_bindir/plumage_stats
+%_bindir/plumage_history
 %_datadir/condor/plumage/README
 %_datadir/condor/plumage/SCHEMA
 %_datadir/condor/plumage/plumage_accounting
 %_datadir/condor/plumage/plumage_scheduler
 %_datadir/condor/plumage/plumage_utilization
 %defattr(-,condor,condor,-)
-%dir %_var/lib/condor/ViewHist
 %endif
 
 #################
@@ -935,7 +958,7 @@ rm -rf %{buildroot}
 %files classads
 %defattr(-,root,root,-)
 %doc LICENSE-2.0.txt NOTICE.txt
-%_libdir/libclassad.so.4
+%_libdir/libclassad.so.5
 %_libdir/libclassad.so.%{tarball_version}
 
 #################
@@ -1035,6 +1058,9 @@ fi
 %endif
 
 %changelog
+* Thu Aug 28 2013 <tstclair@redhat.com> - 7.9.5-0.1
+- Fast forward to 7.9.5 pre-release
+
 * Sun Feb 10 2013 Denis Arnaud <denis.arnaud_fedora@m4x.org> - 7.9.1-0.1.5
 - Rebuild for Boost-1.53.0
 
