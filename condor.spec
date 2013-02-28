@@ -1058,7 +1058,7 @@ fi
 %endif
 
 %changelog
-* Thu Aug 28 2013 <tstclair@redhat.com> - 7.9.5-0.1
+* Thu Feb 28 2013 <tstclair@redhat.com> - 7.9.5-0.1
 - Fast forward to 7.9.5 pre-release
 
 * Sun Feb 10 2013 Denis Arnaud <denis.arnaud_fedora@m4x.org> - 7.9.1-0.1.5
