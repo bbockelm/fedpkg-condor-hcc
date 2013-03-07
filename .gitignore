@@ -1,3 +1,12 @@
 .*.swp
-/condor-7.7.3-c39a8b84-GIT.tar.gz
 _build
+/condor-7.7.3-c39a8b84-GIT.tar.gz
+/condor-7.7.5-03a0f934-GIT.tar.gz
+/condor-7.7.5-e5e734c8-GIT.tar.gz
+/condor-7.7.5-e5e734c8-2-GIT.tar.gz
+/condor-7.9.0-3b0e7b0c-GIT.tar.gz
+/condor-7.9.1-65cac1a2-RH.tar.gz
+/condor-7.9.1-c88f1e4e-RH.tar.gz
+/condor-7.9.1-83a2a073-RH.tar.gz
+/condor-7.9.5-af94b2ac-RH.tar.gz
+/condor-7.9.5-8015f029-RH.tar.gz
