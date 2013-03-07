@@ -38,7 +38,7 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 4e2a2ef
+%define git_rev 1849ac1
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -48,7 +48,7 @@
 Summary: Condor: High Throughput Computing
 Name: condor
 Version: %{tarball_version}
-%define condor_base_release 0.1
+%define condor_base_release 0.3
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git
 %else
@@ -599,6 +599,11 @@ populate %_sysconfdir/condor/config.d %{buildroot}/etc/examples/61aviary.config
 mkdir -p %{buildroot}/%{_var}/lib/condor/aviary
 populate %{_var}/lib/condor/aviary %{buildroot}/usr/axis2.xml
 populate %{_var}/lib/condor/aviary %{buildroot}/usr/services/
+#populate %{_var}/lib/condor/aviary %{buildroot}/usr/collector/
+mv %{buildroot}%{_var}/lib/condor/aviary/services/hadoop/libaviary_hadoop_axis.so %{buildroot}%{_libdir}/condor/plugins/
+mv %{buildroot}%{_var}/lib/condor/aviary/services/collector/libaviary_collector_axis.so %{buildroot}%{_libdir}/condor/plugins/
+mv %{buildroot}%{_datadir}/condor/libaviary_axis_provider.so %{buildroot}%{_libdir}/condor/plugins/
+mv %{buildroot}%{_datadir}/condor/libaviary_wso2_common.so %{buildroot}%{_libdir}/condor/plugins/
 %endif
 
 %if %plumage
@@ -923,6 +928,7 @@ rm -rf %{buildroot}
 %_sbindir/grid_monitor.sh
 %_sbindir/remote_gahp
 %_sbindir/nordugrid_gahp
+%_bindir/condor_ping
 %_libexecdir/condor/condor_gpu_discovery
 %defattr(-,condor,condor,-)
 %dir %_var/lib/condor/
@@ -977,6 +983,12 @@ rm -rf %{buildroot}
 %dir %_libdir/condor/plugins
 %_libdir/condor/plugins/AviaryScheddPlugin-plugin.so
 %_libdir/condor/plugins/AviaryLocatorPlugin-plugin.so
+%_libdir/condor/plugins/AviaryCollectorPlugin-plugin.so
+%_libdir/condor/plugins/AviaryHadoopPlugin-plugin.so
+%_libdir/condor/plugins/libaviary_collector_axis.so
+%_libdir/condor/plugins/libaviary_hadoop_axis.so
+%_libdir/condor/plugins/libaviary_wso2_common.so
+%_libdir/condor/plugins/libaviary_axis_provider.so
 %_sbindir/aviary_query_server
 %dir %_datadir/condor/aviary
 %_datadir/condor/aviary/jobcontrol.py*
@@ -988,6 +1000,12 @@ rm -rf %{buildroot}
 %_datadir/condor/aviary/submit.py*
 %_datadir/condor/aviary/setattr.py*
 %_datadir/condor/aviary/subinventory.py*
+%_datadir/condor/aviary/collector_tool.py*
+%_datadir/condor/aviary/hadoop_tool.py*
+%_datadir/condor/aviary/hdfs_datanode.sh
+%_datadir/condor/aviary/hdfs_namenode.sh
+%_datadir/condor/aviary/mapred_jobtracker.sh
+%_datadir/condor/aviary/mapred_tasktracker.sh
 %dir %_datadir/condor/aviary/dag
 %_datadir/condor/aviary/dag/diamond.dag
 %_datadir/condor/aviary/dag/dag-submit.py*
@@ -1018,6 +1036,15 @@ rm -rf %{buildroot}
 %_var/lib/condor/aviary/services/locator/aviary-locator.xsd
 %_var/lib/condor/aviary/services/locator/libaviary_locator_axis.so
 %_var/lib/condor/aviary/services/locator/services.xml
+%_var/lib/condor/aviary/services/collector/aviary-collector.wsdl
+%_var/lib/condor/aviary/services/collector/aviary-collector.xsd
+%_var/lib/condor/aviary/services/collector/aviary-common.xsd
+%_var/lib/condor/aviary/services/collector/services.xml
+%_var/lib/condor/aviary/services/hadoop/aviary-common.xsd
+%_var/lib/condor/aviary/services/hadoop/aviary-hadoop.wsdl
+%_var/lib/condor/aviary/services/hadoop/aviary-hadoop.xsd
+%_var/lib/condor/aviary/services/hadoop/services.xml
+
 %endif
 
 %if %plumage
