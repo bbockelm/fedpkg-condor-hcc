@@ -36,9 +36,9 @@ index 52f14c0..41b9002 100644
 --- a/src/condor_contrib/CMakeLists.txt
 +++ b/src/condor_contrib/CMakeLists.txt
 @@ -32,4 +32,5 @@ else(WANT_CONTRIB)
-   dprint("skipping contrib modules")
    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/campus_factory")
    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/bosco")
+   add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/lark")
 +  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/python-bindings")
  endif(WANT_CONTRIB)
 diff --git a/src/condor_contrib/python-bindings/CMakeLists.txt b/src/condor_contrib/python-bindings/CMakeLists.txt
