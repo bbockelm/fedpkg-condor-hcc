@@ -36,7 +36,7 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 4ff4ac4
+%define git_rev 52a49e5
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -1243,7 +1243,7 @@ fi
 %endif
 
 %changelog
-* Tue Mar 26 2013 <bbockelm@cse.unl.edu> - 7.9.6-0.1.4ff4ac4.git.lark
+* Tue Mar 26 2013 <bbockelm@cse.unl.edu> - 7.9.6-0.1.52a49e5.git.lark
 - Rebuild lark for 7.9.6 pre-release.
 
 * Thu Feb 28 2013 <tstclair@redhat.com> - 7.9.5-0.1
