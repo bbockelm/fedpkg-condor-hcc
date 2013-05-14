@@ -1,4 +1,4 @@
-%define tarball_version 7.9.6
+%define tarball_version 7.9.7
 
 #%define _default_patch_fuzz 2
 
@@ -36,7 +36,7 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 52a49e5
+%define git_rev 82ce435
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -45,7 +45,7 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.9.6
+Version: 7.9.7
 %define condor_base_release 0.1
 %if %git_build
 	%define condor_release %condor_base_release.%{git_rev}.git.lark
@@ -561,6 +561,7 @@ populate %{_datadir}/condor %{buildroot}/%{_usr}/lib/*
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libclassad.s*
 populate %{_libdir}/ %{buildroot}/%{_datadir}/condor/libcondor_utils*.so
 rm -f %{buildroot}/%{_datadir}/condor/libclassad.a
+rm -f %{buildroot}/%{_datadir}/condor/libpyclassad_*.a
 
 %if %aviary
 populate %{_libdir}/condor/plugins %{buildroot}/%{_usr}/libexec/*-plugin.so
@@ -679,8 +680,8 @@ install -Dp -m0755 %{buildroot}/etc/examples/condor.init %buildroot/%_initrddir/
 %endif
 
 mkdir -p %{buildroot}%{python_sitearch}
-install -m 0755 src/condor_contrib/python-bindings/{classad,htcondor}.so %{buildroot}%{python_sitearch}
-install -m 0755 src/condor_contrib/python-bindings/libpyclassad_*.so %{buildroot}%{_libdir}
+install -m 0755 src/python-bindings/{classad,htcondor}.so %{buildroot}%{python_sitearch}
+#install -m 0755 src/condor_contrib/python-bindings/libpyclassad_*.so %{buildroot}%{_libdir}
 
 # we must place the config examples in builddir so %doc can find them
 mv %{buildroot}/etc/examples %_builddir/%name-%tarball_version
@@ -865,6 +866,7 @@ rm -rf %{buildroot}
 %_bindir/condor_transfer_data
 %_bindir/condor_check_userlogs
 %_bindir/condor_q
+%_bindir/condor_qsub
 %_libexecdir/condor/condor_transferer
 %_bindir/condor_cod
 %_bindir/condor_qedit
@@ -1151,7 +1153,7 @@ rm -rf %{buildroot}
 %_includedir/classad/xmlLexer.h
 %_includedir/classad/xmlSink.h
 %_includedir/classad/xmlSource.h
-%_includedir/classad/classadCache.h
+#%_includedir/classad/classadCache.h
 
 %if %cream
 %files cream-gahp
@@ -1162,7 +1164,7 @@ rm -rf %{buildroot}
 
 %files python
 %defattr(-,root,root,-)
-%_libdir/libpyclassad_*.so
+#%_libdir/libpyclassad_*.so
 %{python_sitearch}/classad.so
 %{python_sitearch}/htcondor.so
 
@@ -1243,6 +1245,10 @@ fi
 %endif
 
 %changelog
+* Tue May 14 2013 <zzhang@cse.unl.edu> - 7.9.7-0.1.82ce435.git.lark
+- Rebuild lark for 7.9.7
+- Some lark related bugs fixed
+
 * Tue Mar 26 2013 <bbockelm@cse.unl.edu> - 7.9.6-0.1.52a49e5.git.lark
 - Rebuild lark for 7.9.6 pre-release.
 
