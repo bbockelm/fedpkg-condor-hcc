@@ -206,7 +206,9 @@ Requires: blahp >= 1.16.1
 
 BuildRequires: python-devel
 BuildRequires: boost-devel
+%if 0%{?rhel} >= 6
 BuildRequires: boost-python
+%endif
 
 %if %systemd
 BuildRequires: systemd-units
