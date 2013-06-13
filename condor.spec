@@ -1,4 +1,4 @@
-%define tarball_version 7.9.7
+%define tarball_version 8.1.0
 
 #%define _default_patch_fuzz 2
 
@@ -36,7 +36,7 @@
 %define git_build 1
 # If building with git tarball, Fedora requests us to record the rev.  Use:
 # git log -1 --pretty=format:'%h'
-%define git_rev 82ce435
+%define git_rev 3c50666
 
 %if ! (0%{?fedora} > 12 || 0%{?rhel} > 5)
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
@@ -45,10 +45,10 @@
 
 Summary: Condor: High Throughput Computing
 Name: condor
-Version: 7.9.7
+Version: 8.1.0
 %define condor_base_release 0.1
 %if %git_build
-	%define condor_release %condor_base_release.%{git_rev}.git.lark
+	%define condor_release %condor_base_release.%{git_rev}.git
 %else
 	%define condor_release %condor_base_release
 %endif
@@ -116,17 +116,10 @@ Patch0: condor_config.generic.patch
 Patch1: chkconfig_off.patch
 Patch2: hcc_config.patch
 Patch3: wso2-axis2.patch
-Patch4: condor_pid_namespaces_v7.patch
 Patch5: condor-gahp.patch
-#Patch6: cgahp_scaling.patch
-#Patch7: condor-1605-v4.patch
-#Patch7: condor_host_alias_patch.txt
 Patch8: lcmaps_env_in_init_script.patch
 # See gt3158
 Patch9: 0001-Apply-the-user-s-condor_config-last-rather-than-firs.patch
-Patch11: condor_oom_v3.patch
-# From ZKM
-#Patch12: zkm-782.patch
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -458,13 +451,8 @@ exit 0
 %patch1 -p1
 %patch2 -p1
 %patch3 -p0
-#%patch4 -p1
 %patch5 -p1
-#%patch6 -p1
-#%patch7 -p1
 %patch9 -p1
-#%patch10 -p1
-#%patch11 -p1
 
 %if %systemd
 cp %{SOURCE2} %{name}-tmpfiles.conf
@@ -633,17 +621,6 @@ mkdir -p -m1777 %{buildroot}/%{_var}/lib/condor/execute
 rm %{buildroot}/%{_sbindir}/condor_set_shutdown
 rm %{buildroot}/%{_mandir}/man1/condor_set_shutdown.1
 
-# not packaging deployment tools
-rm %{buildroot}/%{_mandir}/man1/condor_config_bind.1
-rm %{buildroot}/%{_mandir}/man1/condor_cold_start.1
-rm %{buildroot}/%{_mandir}/man1/condor_cold_stop.1
-rm %{buildroot}/%{_mandir}/man1/uniq_pid_midwife.1
-rm %{buildroot}/%{_mandir}/man1/uniq_pid_undertaker.1
-rm %{buildroot}/%{_mandir}/man1/filelock_midwife.1
-rm %{buildroot}/%{_mandir}/man1/filelock_undertaker.1
-rm %{buildroot}/%{_mandir}/man1/install_release.1
-rm %{buildroot}/%{_mandir}/man1/cleanup_release.1
-
 # not packaging standard universe
 rm %{buildroot}/%{_mandir}/man1/condor_compile.1
 rm %{buildroot}/%{_mandir}/man1/condor_checkpoint.1
@@ -781,6 +758,7 @@ rm -rf %{buildroot}
 %_datadir/condor/scimark2lib.jar
 %dir %_sysconfdir/condor/config.d/
 %config(noreplace) %_sysconfdir/condor/config.d/00personal_condor.config
+%config(noreplace) %_sysconfdir/condor/ganglia.d/00_default_metrics
 %_sysconfdir/condor/condor_ssh_to_job_sshd_config_template
 %dir %_libexecdir/condor/
 %_libexecdir/condor/condor_chirp
@@ -813,6 +791,7 @@ rm -rf %{buildroot}
 %_libexecdir/condor/condor_defrag
 #%_libexecdir/condor/condor_schedd.init
 %_libexecdir/condor/interactive.sub
+%_libexecdir/condor/condor_gangliad
 %_mandir/man1/condor_advertise.1.gz
 %_mandir/man1/condor_check_userlogs.1.gz
 %_mandir/man1/condor_chirp.1.gz
@@ -858,6 +837,7 @@ rm -rf %{buildroot}
 %_mandir/man1/condor_glidein.1.gz
 %_mandir/man1/condor_gather_info.1.gz
 %_mandir/man1/condor_router_rm.1.gz
+%_mandir/man1/condor_qsub.1.gz
 
 # bin/condor is a link for checkpoint, reschedule, vacate
 %_libdir/libcondor_utils*.so
@@ -956,8 +936,8 @@ rm -rf %{buildroot}
 %_datadir/condor/libcondorapi.so
 
 # Lark files.
-%_libdir/condor/plugins/lark-plugin.so
-%_libexecdir/condor/lark_network_namespace_tester
+#%_libdir/condor/plugins/lark-plugin.so
+#%_libexecdir/condor/lark_network_namespace_tester
 
 #################
 %files procd
@@ -1247,6 +1227,9 @@ fi
 %endif
 
 %changelog
+* Thu Jun 13 2013 <bbockelm@cse.unl.edu> - 8.1.0-0.1.3c50666.git
+- Update to 8.1.0 pre-release.
+
 * Tue May 14 2013 <zzhang@cse.unl.edu> - 7.9.7-0.1.82ce435.git.lark
 - Rebuild lark for 7.9.7
 - Some lark related bugs fixed

@@ -120,16 +120,6 @@ index a800f31..80ad566 100644
  
  ## This setting tells Condor whether to delegate or copy GSI X509
  ## credentials when sending them over the wire between daemons.
-@@ -605,6 +644,9 @@
- MAX_HDFS_LOG            = 1000000
- HDFS_DEBUG              =
- 
-+MAX_TRIGGERD_LOG	= 1000000
-+TRIGGERD_DEBUG        	=
-+
- # High Availability Logs
- MAX_HAD_LOG		= 1000000
- HAD_DEBUG		=
 @@ -932,14 +974,18 @@ TESTINGMODE_CLAIM_WORKLIFE = 1200
  ######################################################################
  
@@ -152,23 +142,6 @@ index a800f31..80ad566 100644
  
  ## If you leave HISTORY undefined (comment it out), no history file
  ## will be created. 
-@@ -963,6 +1009,7 @@ HAD_LOG		= $(LOG)/HADLog
- REPLICATION_LOG	= $(LOG)/ReplicationLog
- TRANSFERER_LOG	= $(LOG)/TransfererLog
- HDFS_LOG	= $(LOG)/HDFSLog
-+TRIGGERD_LOG	= $(LOG)/TriggerLog
- 
- ##  Lock files
- SHADOW_LOCK	= $(LOCK)/ShadowLock
-@@ -1084,7 +1131,7 @@ DAEMON_LIST			= MASTER, STARTD, SCHEDD
- #MASTER, STARTD, SCHEDD, KBDD, COLLECTOR, NEGOTIATOR, EVENTD, \
- #VIEW_SERVER, CONDOR_VIEW, VIEW_COLLECTOR, HAWKEYE, CREDD, HAD, \
- #DBMSD, QUILL, JOB_ROUTER, ROOSTER, LEASEMANAGER, HDFS, SHARED_PORT, \
--#DEFRAG
-+#DEFRAG TRIGGERD
- 
- 
- ##  Where are the binaries for these daemons?
 @@ -1094,7 +1141,6 @@ SCHEDD				= $(SBIN)/condor_schedd
  KBDD				= $(SBIN)/condor_kbdd
  NEGOTIATOR			= $(SBIN)/condor_negotiator
@@ -177,14 +150,6 @@ index a800f31..80ad566 100644
  STARTER_LOCAL			= $(SBIN)/condor_starter
  JOB_ROUTER                      = $(LIBEXEC)/condor_job_router
  ROOSTER                         = $(LIBEXEC)/condor_rooster
-@@ -1102,6 +1148,7 @@ HDFS				= $(SBIN)/condor_hdfs
- SHARED_PORT			= $(LIBEXEC)/condor_shared_port
- TRANSFERER			= $(LIBEXEC)/condor_transferer
- DEFRAG                          = $(LIBEXEC)/condor_defrag
-+TRIGGERD			= $(sbin)/condor_triggerd
- 
- ##  When the master starts up, it can place it's address (IP and port)
- ##  into a file.  This way, tools running on the local machine don't
 @@ -1178,11 +1225,13 @@ PREEN_ARGS			= -m -r
  ##--------------------------------------------------------------------
  ## Address to which Condor will send a weekly e-mail with output of
