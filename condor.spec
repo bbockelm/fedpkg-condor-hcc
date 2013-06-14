@@ -140,6 +140,7 @@ BuildRequires: /usr/include/ldap.h
 BuildRequires: latex2html
 BuildRequires: boost-devel
 BuildRequires: /usr/include/uuid/uuid.h
+BuildRequires: ganglia-devel
 
 # Globus GSI build requirements
 BuildRequires: globus-gssapi-gsi-devel
